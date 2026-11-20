@@ -58,7 +58,7 @@ import {
   PRIMARY_LOCAL_ENVIRONMENT_ID,
   resolveEnvironmentMachineKind,
 } from "@t3tools/contracts";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
   BugIcon,
@@ -83,6 +83,7 @@ import {
   SquarePenIcon,
   TextSearchIcon,
   UserPlusIcon,
+  AppWindowIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
 import { dispatchPreviewAction } from "./preview/previewActionBus";
@@ -190,6 +191,7 @@ import {
   newProjectId,
 } from "../lib/utils";
 import { buildThreadRouteParams } from "../threadRoutes";
+import { openAppWindow } from "../appWindows";
 import { useAvailableSettingsSearchItems } from "./settings/useAvailableSettingsSearchItems";
 import {
   applyWslEnvironmentConfiguration,
@@ -434,6 +436,7 @@ function OpenCommandPaletteDialog(props: {
   const gt = useGT();
   const messages = useMessages();
   const navigate = useNavigate();
+  const router = useRouter();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { openChildSearch, setOpen } = props;
   // Keyed by palette session: the intent and restored search only seed this
@@ -1534,6 +1537,27 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
+  if (activeThread !== null) {
+    const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
+    actionItems.push({
+      kind: "action",
+      value: "action:open-thread-in-new-window",
+      searchTerms: ["open", "new", "window", "pop out", "detach", "thread"],
+      title: gt("Open thread in new window"),
+      icon: <AppWindowIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        openAppWindow(
+          router.history.createHref(
+            router.buildLocation({
+              to: "/$environmentId/$threadId",
+              params: buildThreadRouteParams(threadRef),
+            }).href,
+          ),
+        );
+      },
+    });
+  }
+
   if (activeThread !== null && canShareActiveThreadWithGuest) {
     const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
     actionItems.push({
@@ -1812,6 +1836,21 @@ function OpenCommandPaletteDialog(props: {
         <PinIcon className={ITEM_ICON_CLASS} />
       ),
       run: async () => toggleProjectGroupPin(currentProjectGroup),
+    });
+  }
+  if (currentProjectGroup) {
+    actionItems.push({
+      kind: "action",
+      value: "action:open-project-in-new-window",
+      searchTerms: ["open", "new", "window", "project", "threads"],
+      title: gt("Open project in new window"),
+      description: currentProjectGroup.displayName,
+      icon: <AppWindowIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        openAppWindow(router.history.createHref(router.buildLocation({ to: "/" }).href), {
+          projectKey: currentProjectGroup.projectKey,
+        });
+      },
     });
   }
   const contextualProjectGroup = currentProjectGroup ?? projectGroups[0] ?? null;

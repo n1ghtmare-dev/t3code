@@ -4,6 +4,8 @@ import * as Schema from "effect/Schema";
 import { create } from "zustand";
 import { normalizeProjectPathForComparison } from "@t3tools/client-runtime/state/projects";
 
+import { readWindowSidebarScope, writeWindowSidebarScope } from "./appWindows";
+
 export const PERSISTED_STATE_KEY = "t3code:ui-state:v1";
 const THREAD_CHANGED_FILES_EXPANSION_VERSION = 2;
 const LEGACY_PERSISTED_STATE_KEYS = [
@@ -160,6 +162,13 @@ export function parsePersistedState(parsed: PersistedUiState): UiState {
 }
 
 function readPersistedState(): UiState {
+  const state = readSharedPersistedState();
+  // A project window keeps its own sidebar scope beside the shared preferences.
+  const windowScope = readWindowSidebarScope();
+  return windowScope === null ? state : { ...state, sidebarProjectScopeKeys: windowScope };
+}
+
+function readSharedPersistedState(): UiState {
   if (typeof window === "undefined") {
     return initialState;
   }
@@ -214,6 +223,11 @@ export function persistState(state: UiState): void {
     return;
   }
   try {
+    let sidebarProjectScopeKeys = state.sidebarProjectScopeKeys;
+    if (readWindowSidebarScope() !== null) {
+      writeWindowSidebarScope(sidebarProjectScopeKeys);
+      sidebarProjectScopeKeys = readSharedPersistedState().sidebarProjectScopeKeys;
+    }
     window.localStorage.setItem(
       PERSISTED_STATE_KEY,
       JSON.stringify({
@@ -221,12 +235,10 @@ export function persistState(state: UiState): void {
         projectOrder: state.projectOrder,
         threadLastVisitedAtById: state.threadLastVisitedAtById,
         defaultAdvertisedEndpointKey: state.defaultAdvertisedEndpointKey,
-        sidebarProjectScopeKeys: state.sidebarProjectScopeKeys,
+        sidebarProjectScopeKeys,
         // Older clients read only this field.
         sidebarProjectScopeKey:
-          state.sidebarProjectScopeKeys.length === 1
-            ? (state.sidebarProjectScopeKeys[0] ?? null)
-            : null,
+          sidebarProjectScopeKeys.length === 1 ? (sidebarProjectScopeKeys[0] ?? null) : null,
         threadChangedFilesExpansionVersion: THREAD_CHANGED_FILES_EXPANSION_VERSION,
         threadChangedFilesExpandedById: state.threadChangedFilesExpandedById,
         pullRequestMergeMethod: state.pullRequestMergeMethod,

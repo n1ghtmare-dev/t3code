@@ -46,6 +46,10 @@ import { makeQuitShortcutHandler } from "./QuitHold.ts";
 import { copyContextMenuImage } from "./ContextMenuImage.ts";
 
 const TITLEBAR_HEIGHT = 40;
+// The web app opens extra windows with window.open(url, APP_WINDOW_TARGET_PREFIX + id);
+// apps/web/src/appWindows.ts uses the same prefix.
+export const APP_WINDOW_TARGET_PREFIX = "t3code-window-";
+const SECONDARY_WINDOW_CASCADE_PX = 32;
 
 class ContextMenuImageCopyError extends Schema.TaggedError<ContextMenuImageCopyError>()(
   "ContextMenuImageCopyError",
@@ -441,13 +445,39 @@ export const make = Effect.gen(function* () {
     yield* previewManager.reapplyZoom();
   });
 
-  const createWindow = Effect.fn("desktop.window.createWindow")(function* (): Effect.fn.Return<
-    Option.Option<Electron.BrowserWindow>,
-    DesktopWindowError
-  > {
+  // Cascade from the focused app window so a new window never lands exactly on top of it.
+  const secondaryWindowBounds = Effect.fn("desktop.window.secondaryWindowBounds")(function* (
+    displays: readonly DisplayBounds[],
+  ) {
+    const anchor = yield* electronWindow.focusedAppOrMain;
+    if (Option.isNone(anchor) || anchor.value.isDestroyed()) {
+      return DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE;
+    }
+    const current =
+      anchor.value.isMaximized() || anchor.value.isFullScreen()
+        ? anchor.value.getNormalBounds()
+        : anchor.value.getBounds();
+    const cascaded = {
+      x: Math.round(current.x + SECONDARY_WINDOW_CASCADE_PX),
+      y: Math.round(current.y + SECONDARY_WINDOW_CASCADE_PX),
+      width: Math.round(current.width),
+      height: Math.round(current.height),
+    };
+    return displays.some((display) => windowFitsWithinDisplay(cascaded, display))
+      ? cascaded
+      : DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE;
+  });
+
+  // A secondary window loads one app route beside the main window. It shares IPC trust and
+  // server connections, but leaves bounds persistence and browser previews to the main window.
+  const createWindow = Effect.fn("desktop.window.createWindow")(function* (
+    options: { readonly secondaryUrl?: string } = {},
+  ): Effect.fn.Return<Option.Option<Electron.BrowserWindow>, DesktopWindowError> {
     if (yield* Ref.get(desktopState.quitting)) return Option.none();
+    const isMain = options.secondaryUrl === undefined;
     yield* previewManager.getBrowserSession();
     const applicationUrl = getDesktopUrl(environment.isDevelopment);
+    const initialUrl = options.secondaryUrl ?? applicationUrl;
     const iconPaths = yield* assets.iconPaths;
     const iconOption = getIconOption(iconPaths, environment.platform);
     const shouldUseDarkColors = yield* electronTheme.shouldUseDarkColors;
@@ -469,9 +499,15 @@ export const make = Effect.gen(function* () {
         : yield* logWindowWarning("failed to read connected displays; using defaults", {
             cause: displayBoundsResult.cause,
           }).pipe(Effect.as<readonly Electron.Rectangle[]>([]));
-    const initialBounds = resolveInitialMainWindowBounds(persistedBounds, displayBounds);
+    const initialBounds = isMain
+      ? resolveInitialMainWindowBounds(persistedBounds, displayBounds)
+      : yield* secondaryWindowBounds(displayBounds);
     const restoredPersistedBounds = persistedBounds !== null && initialBounds === persistedBounds;
-    if (persistedBounds !== null && initialBounds === DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE) {
+    if (
+      isMain &&
+      persistedBounds !== null &&
+      initialBounds === DesktopAppSettings.DEFAULT_MAIN_WINDOW_SIZE
+    ) {
       yield* logWindowWarning("saved main window bounds could not be restored; using defaults");
     }
     if (yield* Ref.get(desktopState.quitting)) return Option.none();
@@ -511,7 +547,7 @@ export const make = Effect.gen(function* () {
     }
     let boundsPersistFiber: Fiber.Fiber<void, never> | undefined;
     let pendingBoundsPersistFiber: Fiber.Fiber<void, never> | undefined;
-    let boundsPersistenceEnabled = persistedBounds === null || restoredPersistedBounds;
+    let boundsPersistenceEnabled = isMain && (persistedBounds === null || restoredPersistedBounds);
     let lastPersistableState: {
       readonly bounds: DesktopAppSettings.DesktopWindowBounds;
       readonly isMaximized: boolean;
@@ -569,6 +605,7 @@ export const make = Effect.gen(function* () {
       return pendingBoundsPersistFiber;
     };
     const scheduleBoundsPersist = () => {
+      if (!isMain) return;
       const state = readPersistableState();
       if (
         !boundsPersistenceEnabled &&
@@ -612,15 +649,18 @@ export const make = Effect.gen(function* () {
         fiber === undefined ? Effect.void : Fiber.join(fiber).pipe(Effect.asVoid),
       ),
     );
-    flushMainWindowBounds = flushBoundsPersist;
-
-    yield* previewManager.setMainWindow(window);
+    if (isMain) {
+      flushMainWindowBounds = flushBoundsPersist;
+      yield* previewManager.setMainWindow(window);
+    }
     if (yield* Ref.get(desktopState.quitting)) {
       yield* electronWindow.destroyAll;
       return Option.none();
     }
     window.webContents.on("will-attach-webview", (event, webPreferences, params) => {
       if (
+        // The preview manager tracks guests of the main window only.
+        !isMain ||
         typeof params.partition !== "string" ||
         !previewManager.isBrowserPartition(params.partition)
       ) {
@@ -757,7 +797,23 @@ export const make = Effect.gen(function* () {
       void runPromise(previewManager.prepareWebview(contents));
     });
 
-    window.webContents.setWindowOpenHandler(({ url }) => {
+    window.webContents.setWindowOpenHandler(({ url, frameName }) => {
+      if (
+        frameName.startsWith(APP_WINDOW_TARGET_PREFIX) &&
+        isSameOriginRendererNavigation({ applicationUrl, navigationUrl: url })
+      ) {
+        runFork(
+          createWindow({ secondaryUrl: url }).pipe(
+            Effect.flatMap((created) =>
+              Option.isSome(created) ? logWindowInfo("secondary window created") : Effect.void,
+            ),
+            Effect.catch((error) =>
+              logWindowWarning("failed to open secondary window", { message: error.message }),
+            ),
+          ),
+        );
+        return { action: "deny" };
+      }
       if (Option.isSome(ElectronShell.parseSafeExternalUrl(url))) {
         void runPromise(electronShell.openExternal(url));
       }
@@ -879,7 +935,7 @@ export const make = Effect.gen(function* () {
       if (window.isDestroyed()) {
         return;
       }
-      void window.loadURL(applicationUrl).catch(() => undefined);
+      void window.loadURL(initialUrl).catch(() => undefined);
     };
     const scheduleDevelopmentLoadRetry = () => {
       if (developmentLoadRetryFiber !== undefined || window.isDestroyed()) {
@@ -1011,7 +1067,7 @@ export const make = Effect.gen(function* () {
       firstRevealComplete = true;
       pendingMainReveals.delete(window);
       window.webContents.setBackgroundThrottling(true);
-      if (persistedSettings.mainWindowMaximized) window.maximize();
+      if (isMain && persistedSettings.mainWindowMaximized) window.maximize();
       yield* electronWindow.reveal(window);
       yield* dismissConnectingSplash;
     });
@@ -1021,16 +1077,21 @@ export const make = Effect.gen(function* () {
       void runPromise(revealWhenReady);
     });
 
-    // Desktop IPC only answers the main window, so register it before its renderer can call in.
-    yield* electronWindow.setMain(window);
+    // Desktop IPC only answers app windows, so register this one before its renderer can call in.
+    if (isMain) {
+      yield* electronWindow.setMain(window);
+    } else {
+      yield* electronWindow.addSecondary(window);
+    }
     loadApplication();
-    if (environment.isDevelopment) {
+    if (isMain && environment.isDevelopment) {
       window.webContents.openDevTools({ mode: "detach" });
     }
 
     window.on("closed", () => {
-      if (!backendHasStarted) mainClosedDuringStartup = true;
       clearDevelopmentLoadRetry();
+      if (!isMain) return;
+      if (!backendHasStarted) mainClosedDuringStartup = true;
       clearBoundsPersist();
       void runPromise(electronWindow.clearMain(Option.some(window)));
     });
@@ -1136,8 +1197,8 @@ export const make = Effect.gen(function* () {
     { reveal = true }: { readonly reveal?: boolean } = {},
   ) {
     if (yield* Ref.get(desktopState.quitting)) return;
-    // Only the main renderer loads the app preload that listens on these channels.
-    const existingWindow = yield* electronWindow.main;
+    // Only app renderers load the preload that listens on these channels; follow the user's focus.
+    const existingWindow = yield* electronWindow.focusedAppOrMain;
     if (Option.isNone(existingWindow) && (!reveal || (yield* waitingForBackend))) return;
     const window = Option.isSome(existingWindow) ? existingWindow : yield* ensureMain;
     if (Option.isNone(window) || window.value.isDestroyed()) return;
@@ -1216,7 +1277,7 @@ export const make = Effect.gen(function* () {
     }),
     zoomMain: Effect.fn("desktop.window.zoomMain")(function* (direction) {
       yield* Effect.annotateCurrentSpan({ direction });
-      const window = yield* electronWindow.main;
+      const window = yield* electronWindow.focusedAppOrMain;
       if (Option.isNone(window) || window.value.isDestroyed()) {
         return;
       }
@@ -1225,7 +1286,7 @@ export const make = Effect.gen(function* () {
     runMainContentsCommand: Effect.fn("desktop.window.runMainContentsCommand")(function* (command) {
       yield* Effect.annotateCurrentSpan({ command });
       // A focused OAuth popup must not receive the app's Reload command.
-      const window = yield* electronWindow.main;
+      const window = yield* electronWindow.focusedAppOrMain;
       if (Option.isNone(window) || window.value.isDestroyed()) return;
       const webContents = window.value.webContents;
       if (command === "reload") webContents.reload();

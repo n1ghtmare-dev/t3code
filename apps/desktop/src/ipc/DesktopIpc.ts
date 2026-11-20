@@ -184,13 +184,11 @@ export const layer = (ipcMain: DesktopIpcMain) =>
     DesktopIpc,
     Effect.gen(function* () {
       const electronWindow = yield* ElectronWindow.ElectronWindow;
+      // Main and secondary app windows load the same app; preview guests never match.
       return make(ipcMain, (event) =>
         Effect.map(
-          electronWindow.main,
-          (main) =>
-            Option.isSome(main) &&
-            main.value.webContents.id === event.sender.id &&
-            main.value.webContents.mainFrame === event.senderFrame,
+          electronWindow.appWindowForSender(event.sender, event.senderFrame ?? null),
+          Option.isSome,
         ),
       );
     }),

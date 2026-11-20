@@ -17,7 +17,9 @@ import {
 import { useRouter } from "@tanstack/react-router";
 import { msg } from "gt-react";
 
+import { openAppWindow } from "../appWindows";
 import { pickSnoozePreset, resolveSnoozePresets } from "../components/Sidebar.snooze";
+import { buildThreadRouteParams } from "../threadRoutes";
 import {
   buildThreadActionMenuItems,
   threadActionRequiresOperate,
@@ -197,6 +199,16 @@ export function useThreadActionMenu(input: {
       switch (action) {
         case "find":
           onFind?.(threadRef);
+          return;
+        case "open-in-new-window":
+          openAppWindow(
+            router.history.createHref(
+              router.buildLocation({
+                to: "/$environmentId/$threadId",
+                params: buildThreadRouteParams(threadRef),
+              }).href,
+            ),
+          );
           return;
         case "project-settings": {
           const project = projects.find(

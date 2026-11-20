@@ -463,7 +463,10 @@ describe("syncHtmlFullscreen", () => {
         if (event === "leave-full-screen") leaveListeners.push(listener);
       },
     } as unknown as Electron.BrowserWindow;
-    const layer = Layer.mock(ElectronWindow.ElectronWindow)({ main: Effect.succeedSome(window) });
+    const layer = Layer.mock(ElectronWindow.ElectronWindow)({
+      appWindowForSender: (sender) =>
+        Effect.succeed(sender.id === 1 ? Option.some(window) : Option.none()),
+    });
     return { window, setFullScreen, finishExit, layer };
   };
   const fromMainRenderer = { sender: { id: 1 } };

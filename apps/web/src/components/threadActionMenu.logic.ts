@@ -6,6 +6,7 @@ import { m, type MessageResolver } from "../i18n/messages";
 
 export type ThreadActionMenuId =
   | "find"
+  | "open-in-new-window"
   | "new-thread-on-branch"
   | "filter-by-project"
   | "turn-into-project"
@@ -129,6 +130,7 @@ export interface ThreadActionMenuState {
 export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean {
   return ![
     "find",
+    "open-in-new-window",
     "new-thread-on-branch",
     "project-settings",
     "mark-unread",
@@ -149,6 +151,7 @@ export function buildThreadActionMenuItems(
     ...(state.canFind
       ? [{ id: "find" as const, label: resolve(msg("Find in thread")), icon: "text-search" }]
       : []),
+    { id: "open-in-new-window", label: resolve(msg("Open in new window")), icon: "app-window" },
     ...(state.branch
       ? [
           {

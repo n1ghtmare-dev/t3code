@@ -125,6 +125,9 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     focusedMainOrFirst: Effect.succeedNone,
     setMain: () => Effect.void,
     clearMain: () => Effect.void,
+    addSecondary: () => Effect.void,
+    appWindowForSender: () => Effect.succeedNone,
+    focusedAppOrMain: Effect.succeedNone,
     prepareReveal: () => Effect.succeed(false),
     reveal: () => Effect.void,
     sendAll: (_channel, state) =>

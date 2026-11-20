@@ -106,6 +106,7 @@ import {
 import { isModelPickerOpen } from "../modelPickerVisibility";
 import { isMacPlatform } from "~/lib/utils";
 import { readLocalApi } from "../localApi";
+import { openAppWindow } from "../appWindows";
 import { configuredHostedAppUrl } from "../hostedPairing";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
 import { SidebarFolderDrop } from "./sidebar/SidebarFolderDrop";
@@ -1273,6 +1274,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           api.contextMenu.show(
             [
               { id: "new-thread", label: gt("New thread") },
+              { id: "open-in-new-window", label: gt("Open in new window"), icon: "app-window" },
               { id: "copy-path", label: gt("Copy path") },
               ...(canPinProject(group)
                 ? [
@@ -1291,6 +1293,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         switch (clicked.value) {
           case "new-thread":
             startThreadInProjectFolder(group);
+            return;
+          case "open-in-new-window":
+            // The new window lists only this project's threads; its scope stays its own.
+            openAppWindow(router.history.createHref(router.buildLocation({ to: "/" }).href), {
+              projectKey: group.projectKey,
+            });
             return;
           case "copy-path":
             copyPathToClipboard(group.workspaceRoot, { path: group.workspaceRoot });
@@ -2714,6 +2722,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           return;
         }
         switch (clicked.value) {
+          case "open-in-new-window":
+            openAppWindow(
+              router.history.createHref(
+                router.buildLocation({
+                  to: "/$environmentId/$threadId",
+                  params: buildThreadRouteParams(threadRef),
+                }).href,
+              ),
+            );
+            return;
           case "filter-by-project":
             if (threadProjectGroup) {
               setProjectScopeKeys(

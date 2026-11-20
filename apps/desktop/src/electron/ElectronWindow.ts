@@ -42,6 +42,27 @@ async function isWindowsBrowserWindowForeground(window: Electron.BrowserWindow):
   return foreground === hwnd;
 }
 
+interface AppWindowCandidate {
+  readonly webContents: { readonly id: number; readonly mainFrame: unknown };
+}
+
+/**
+ * The app window whose renderer sent a message. With a frame, only that window's top frame
+ * matches, so subframes and preview guests never borrow an app window's trust.
+ */
+export function findAppWindowForSender<W extends AppWindowCandidate>(
+  windows: readonly W[],
+  sender: { readonly id: number },
+  senderFrame?: unknown,
+): Option.Option<W> {
+  const window = windows.find((candidate) => candidate.webContents.id === sender.id);
+  if (window === undefined) return Option.none();
+  if (senderFrame !== undefined && window.webContents.mainFrame !== senderFrame) {
+    return Option.none();
+  }
+  return Option.some(window);
+}
+
 const ElectronWindowCreateOptions = Schema.Struct({
   title: Schema.NullOr(Schema.String),
   width: Schema.NullOr(Schema.Number),
@@ -120,6 +141,17 @@ export class ElectronWindow extends Context.Service<
     readonly focusedMainOrFirst: Effect.Effect<Option.Option<Electron.BrowserWindow>>;
     readonly setMain: (window: Electron.BrowserWindow) => Effect.Effect<void>;
     readonly clearMain: (window: Option.Option<Electron.BrowserWindow>) => Effect.Effect<void>;
+    /** Extra app windows opened beside the main one; they get the same IPC trust as main. */
+    readonly addSecondary: (window: Electron.BrowserWindow) => Effect.Effect<void>;
+    /** The live main or secondary app window whose top frame sent an IPC message. */
+    readonly appWindowForSender: (
+      sender: {
+        readonly id: number;
+      },
+      senderFrame?: unknown,
+    ) => Effect.Effect<Option.Option<Electron.BrowserWindow>>;
+    /** The focused app window, else the main one. Menu actions and zoom follow the user's focus. */
+    readonly focusedAppOrMain: Effect.Effect<Option.Option<Electron.BrowserWindow>>;
     readonly prepareReveal: (window: Electron.BrowserWindow) => Effect.Effect<boolean>;
     readonly reveal: (window: Electron.BrowserWindow) => Effect.Effect<void>;
     readonly sendAll: (channel: string, ...args: readonly unknown[]) => Effect.Effect<void>;
@@ -148,6 +180,7 @@ export const make = Effect.gen(function* () {
   yield* Effect.addFinalizer(() => Effect.sync(() => windowsForegroundFocus?.close()));
   const mainWindowRef = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
   const auxiliaryWindows = new WeakSet<Electron.BrowserWindow>();
+  const secondaryWindows = new Set<Electron.BrowserWindow>();
   const titleBarOverlayWindows = new WeakSet<Electron.BrowserWindow>();
 
   const listWindows = Effect.try({
@@ -216,6 +249,44 @@ export const make = Effect.gen(function* () {
     return yield* currentMainOrFirst;
   });
 
+  const liveAppWindows = Effect.gen(function* () {
+    const windows: Electron.BrowserWindow[] = [];
+    const main = yield* liveMain;
+    if (Option.isSome(main)) windows.push(main.value);
+    for (const window of secondaryWindows) {
+      if (yield* isWindowDestroyed(window)) {
+        secondaryWindows.delete(window);
+        continue;
+      }
+      windows.push(window);
+    }
+    return windows;
+  });
+
+  const appWindowForSender = Effect.fn("ElectronWindow.appWindowForSender")(function* (
+    sender: { readonly id: number },
+    senderFrame?: unknown,
+  ) {
+    return findAppWindowForSender(yield* liveAppWindows, sender, senderFrame);
+  });
+
+  const focusedAppOrMain = Effect.gen(function* () {
+    const focused = yield* Effect.try({
+      try: () => Electron.BrowserWindow.getFocusedWindow() ?? null,
+      catch: (cause) =>
+        new ElectronWindowOperationError({
+          operation: "get-focused-window",
+          platform,
+          windowId: null,
+          channel: null,
+          cause,
+        }),
+    }).pipe(Effect.orDie);
+    const appWindows = yield* liveAppWindows;
+    if (focused !== null && appWindows.includes(focused)) return Option.some(focused);
+    return yield* liveMain;
+  });
+
   return ElectronWindow.of({
     create: Effect.fn("ElectronWindow.create")(function (options, behavior) {
       const webPreferences = options.webPreferences;
@@ -270,6 +341,17 @@ export const make = Effect.gen(function* () {
         return Option.none();
       });
     }),
+    addSecondary: Effect.fn("ElectronWindow.addSecondary")(function (window) {
+      return Effect.sync(() => {
+        if (window.isDestroyed()) return;
+        secondaryWindows.add(window);
+        window.once("closed", () => {
+          secondaryWindows.delete(window);
+        });
+      });
+    }),
+    appWindowForSender,
+    focusedAppOrMain,
     prepareReveal: Effect.fn("ElectronWindow.prepareReveal")(function (window) {
       return Effect.promise(async () => {
         if (platform !== "win32" || window.isDestroyed()) {

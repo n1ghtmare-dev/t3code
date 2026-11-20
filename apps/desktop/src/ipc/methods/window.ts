@@ -467,13 +467,9 @@ export const pasteAsText = DesktopIpc.makeIpcMethod({
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.window.pasteAsText")(function* (_input, event) {
     const electronWindow = yield* ElectronWindow.ElectronWindow;
-    const window = yield* electronWindow.main;
-    if (
-      event === undefined ||
-      Option.isNone(window) ||
-      window.value.isDestroyed() ||
-      window.value.webContents.id !== event.sender.id
-    ) {
+    if (event === undefined) return;
+    const window = yield* electronWindow.appWindowForSender(event.sender);
+    if (Option.isNone(window) || window.value.isDestroyed()) {
       return;
     }
     const focused = Electron.webContents.getFocusedWebContents();
@@ -493,14 +489,9 @@ export const revealWindow = DesktopIpc.makeIpcMethod({
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.window.revealWindow")(function* (_input, event) {
     const electronWindow = yield* ElectronWindow.ElectronWindow;
-    const window = yield* electronWindow.main;
-    if (
-      event === undefined ||
-      Option.isNone(window) ||
-      window.value.webContents.id !== event.sender.id
-    ) {
-      return;
-    }
+    if (event === undefined) return;
+    const window = yield* electronWindow.appWindowForSender(event.sender);
+    if (Option.isNone(window)) return;
     yield* electronWindow.reveal(window.value);
   }),
 });
@@ -523,7 +514,7 @@ const htmlFullscreenState = (window: Electron.BrowserWindow) => {
   return state;
 };
 
-// The main window keeps HTML fullscreen inside itself so preview guests stay in their webview,
+// App windows keep HTML fullscreen inside itself so preview guests stay in their webview,
 // so the app's own fullscreen elements, such as chat videos, take the screen here.
 export const syncHtmlFullscreen = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.SYNC_HTML_FULLSCREEN_CHANNEL,
@@ -531,16 +522,12 @@ export const syncHtmlFullscreen = DesktopIpc.makeIpcMethod({
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.window.syncHtmlFullscreen")(function* (fullscreen, event) {
     const electronWindow = yield* ElectronWindow.ElectronWindow;
-    const main = yield* electronWindow.main;
-    if (
-      event === undefined ||
-      Option.isNone(main) ||
-      main.value.isDestroyed() ||
-      main.value.webContents.id !== event.sender.id
-    ) {
+    if (event === undefined) return;
+    const appWindow = yield* electronWindow.appWindowForSender(event.sender);
+    if (Option.isNone(appWindow) || appWindow.value.isDestroyed()) {
       return;
     }
-    const window = main.value;
+    const window = appWindow.value;
     const state = htmlFullscreenState(window);
     if (fullscreen) {
       // macOS reports fullscreen until its exit animation ends, and Electron queues the re-entry.
