@@ -7,6 +7,8 @@ import { m, type MessageResolver } from "../i18n/messages";
 export type ThreadActionMenuId =
   | "find"
   | "open-in-new-window"
+  | "open-in-new-tab"
+  | "open-in-split"
   | "new-thread-on-branch"
   | "filter-by-project"
   | "turn-into-project"
@@ -97,6 +99,8 @@ export function buildDraftActionMenuItems(
 export interface ThreadActionMenuState {
   readonly canOperate: boolean;
   readonly canFind?: boolean;
+  /** The thread already fills this window's main pane, so tab and split entries are hidden. */
+  readonly isOpenHere?: boolean;
   /** False where no inline title editor is rendered, such as sidebar search results. */
   readonly canRename?: boolean;
   readonly branch: string | null;
@@ -131,6 +135,8 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
   return ![
     "find",
     "open-in-new-window",
+    "open-in-new-tab",
+    "open-in-split",
     "new-thread-on-branch",
     "project-settings",
     "mark-unread",
@@ -151,6 +157,20 @@ export function buildThreadActionMenuItems(
     ...(state.canFind
       ? [{ id: "find" as const, label: resolve(msg("Find in thread")), icon: "text-search" }]
       : []),
+    ...(state.isOpenHere
+      ? []
+      : [
+          {
+            id: "open-in-new-tab" as const,
+            label: resolve(msg("Open in new tab")),
+            icon: "app-window",
+          },
+          {
+            id: "open-in-split" as const,
+            label: resolve(msg("Open in split view")),
+            icon: "columns-2",
+          },
+        ]),
     { id: "open-in-new-window", label: resolve(msg("Open in new window")), icon: "app-window" },
     ...(state.branch
       ? [

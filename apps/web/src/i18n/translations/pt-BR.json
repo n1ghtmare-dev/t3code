@@ -12198,5 +12198,14 @@
   "9e91e9a77b664e4e": "Não foi possível iniciar um guia de revisão",
   "857c40e25a3162fd": "Abrir em nova janela",
   "42bd5827009e7a8a": "Abrir thread em nova janela",
-  "449aa94a550859c6": "Abrir projeto em nova janela"
+  "449aa94a550859c6": "Abrir projeto em nova janela",
+  "d4ece5c971d4b3e8": "Abrir em nova aba",
+  "1df072b6acb2feef": "Abrir em visualização dividida",
+  "e767812b3ea33ec3": "Threads abertas",
+  "91f13ad9b788f8d5": "Fechar visualização dividida",
+  "62dc4d3a19ff7ca0": "Fechar aba",
+  "b7a8465e4a5019e2": "Fechar outras abas",
+  "b7415d9810e06821": "Movido para o painel principal",
+  "01fa365ced3c9340": "Execute o comando novamente no painel principal, onde fica o terminal.",
+  "2f0259a5254a15ee": "Mostrar no painel principal"
 }

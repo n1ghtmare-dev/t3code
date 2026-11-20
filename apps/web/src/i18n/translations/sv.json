@@ -12206,5 +12206,14 @@
   "9e91e9a77b664e4e": "Kunde inte starta en granskningsguide",
   "857c40e25a3162fd": "Öppna i nytt fönster",
   "42bd5827009e7a8a": "Öppna tråd i nytt fönster",
-  "449aa94a550859c6": "Öppna projekt i nytt fönster"
+  "449aa94a550859c6": "Öppna projekt i nytt fönster",
+  "d4ece5c971d4b3e8": "Öppna i ny flik",
+  "1df072b6acb2feef": "Öppna i delad vy",
+  "e767812b3ea33ec3": "Öppna trådar",
+  "91f13ad9b788f8d5": "Stäng delad vy",
+  "62dc4d3a19ff7ca0": "Stäng flik",
+  "b7a8465e4a5019e2": "Stäng andra flikar",
+  "b7415d9810e06821": "Flyttad till huvudpanelen",
+  "01fa365ced3c9340": "Kör kommandot igen från huvudpanelen, där terminalen finns.",
+  "2f0259a5254a15ee": "Visa i huvudpanelen"
 }

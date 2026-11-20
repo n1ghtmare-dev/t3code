@@ -12208,5 +12208,14 @@
   "9e91e9a77b664e4e": "Could not start a review guide",
   "857c40e25a3162fd": "Open in new window",
   "42bd5827009e7a8a": "Open thread in new window",
-  "449aa94a550859c6": "Open project in new window"
+  "449aa94a550859c6": "Open project in new window",
+  "d4ece5c971d4b3e8": "Open in new tab",
+  "1df072b6acb2feef": "Open in split view",
+  "e767812b3ea33ec3": "Open threads",
+  "91f13ad9b788f8d5": "Close split view",
+  "62dc4d3a19ff7ca0": "Close tab",
+  "b7a8465e4a5019e2": "Close other tabs",
+  "b7415d9810e06821": "Moved to the main pane",
+  "01fa365ced3c9340": "Run the command again from the main pane, where the terminal is.",
+  "2f0259a5254a15ee": "Show in the main pane"
 }

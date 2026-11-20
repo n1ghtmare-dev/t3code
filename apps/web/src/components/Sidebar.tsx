@@ -107,6 +107,7 @@ import { isModelPickerOpen } from "../modelPickerVisibility";
 import { isMacPlatform } from "~/lib/utils";
 import { readLocalApi } from "../localApi";
 import { openAppWindow } from "../appWindows";
+import { useOpenThreadInWorkspace } from "./chat/ThreadWorkspace";
 import { configuredHostedAppUrl } from "../hostedPairing";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
 import { SidebarFolderDrop } from "./sidebar/SidebarFolderDrop";
@@ -923,6 +924,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } = useSidebarLookups();
   const delegatedUnderParent = useDelegatedUnderParent();
   const router = useRouter();
+  const threadWorkspace = useOpenThreadInWorkspace();
   const { isMobile, setOpenMobile } = useSidebar();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
@@ -1584,6 +1586,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const readOpensPullRequestsInRightPanel = useStableCallback(() => routeThreadRef !== null);
   const handleThreadClick = (event: ReactMouseEvent, threadRef: ScopedThreadRef) => {
     if (isSidebarNestedLinkClick(event.target)) return;
+    // Middle click opens the thread in a new tab of this window, as in a browser.
+    if (event.button === 1) {
+      event.preventDefault();
+      if (isMobile) setOpenMobile(false);
+      threadWorkspace.openInNewTab(threadRef);
+      return;
+    }
     const isMac = isMacPlatform(navigator.platform);
     const isModClick = isMac ? event.metaKey : event.ctrlKey;
     const threadKey = scopedThreadKey(threadRef);
@@ -2673,6 +2682,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 AuthOrchestrationOperateScope,
               ),
               branch: thread.branch ?? null,
+              isOpenHere: threadKey === routeThreadKey,
               // An archived project is not a filter choice.
               projectFilter:
                 threadProjectGroup && !threadProjectGroup.archived
@@ -2731,6 +2741,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 }).href,
               ),
             );
+            return;
+          case "open-in-new-tab":
+            if (isMobile) setOpenMobile(false);
+            threadWorkspace.openInNewTab(threadRef);
+            return;
+          case "open-in-split":
+            threadWorkspace.openInSplit(threadRef);
             return;
           case "filter-by-project":
             if (threadProjectGroup) {

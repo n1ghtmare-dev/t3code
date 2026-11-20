@@ -12,6 +12,7 @@ import { BackgroundThreadContext, HiddenThreadContext } from "./chat/backgroundT
 import { SidebarInset } from "./ui/sidebar";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
+import { useThreadWorkspaceStore } from "../threadWorkspaceStore";
 import {
   useEnvironmentThreadRefs,
   useAnyEnvironmentHiding,
@@ -139,6 +140,16 @@ export function ThreadRouteView({
     draftThreadExists: draftThread !== null,
   });
   const environmentHasAnyThreads = environmentThreadRefs.length > 0 || environmentHasDraftThreads;
+
+  // The route thread owns the main pane and a tab; a draft leaves the next thread its own tab.
+  const routeThreadKey = serverThreadRef === null ? null : scopedThreadKey(serverThreadRef);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- mirrors the route thread into this window's tab and split layout
+  useEffect(() => {
+    if (background) return;
+    const workspace = useThreadWorkspaceStore.getState();
+    if (routeThreadKey === null) workspace.deactivate();
+    else workspace.activate(routeThreadKey);
+  }, [background, routeThreadKey]);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears pending file drops and navigates the router home once a server thread is confirmed missing
   useEffect(() => {

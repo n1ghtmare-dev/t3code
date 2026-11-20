@@ -12,6 +12,10 @@ const ICON_PATHS: Record<string, ReadonlyArray<{ tag: string; attrs: Record<stri
     { tag: "path", attrs: { d: "M10 12h4" } },
   ],
   check: [{ tag: "path", attrs: { d: "M20 6 9 17l-5-5" } }],
+  "columns-2": [
+    { tag: "rect", attrs: { x: "3", y: "3", width: "18", height: "18", rx: "2" } },
+    { tag: "path", attrs: { d: "M12 3v18" } },
+  ],
   "app-window": [
     { tag: "rect", attrs: { x: "2", y: "4", width: "20", height: "16", rx: "2" } },
     { tag: "path", attrs: { d: "M10 4v4" } },
