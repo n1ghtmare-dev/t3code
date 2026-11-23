@@ -52,6 +52,10 @@ if not exist ".env" if exist ".env.example" (
   copy /y ".env.example" ".env" >nul
   set "NEEDBUILD=1"
 )
+rem Everyone works on the shared server, so this computer runs no server of its own: turn the
+rem desktop's local environment off once. Settings -> Environments -> Local environment turns it
+rem back on, and the marker keeps the launcher from undoing that.
+if not exist "%FORKHOME%\remote-only-applied" call :remoteonly
 where git >nul 2>nul
 if errorlevel 1 goto :launch
 echo Проверяю обновления...
@@ -99,6 +103,15 @@ set "T3CODE_FORK_REPO=%REPO%"
 cd /d "%REPO%\apps\desktop"
 rem Официальный T3 Code должен быть закрыт: у них общий профиль окна.
 start "T3 Code" /min cmd /c "node scripts\start-electron.mjs"
+exit /b 0
+
+:remoteonly
+if not exist "%FORKHOME%\userdata" mkdir "%FORKHOME%\userdata"
+powershell -NoProfile -Command "$p = Join-Path $env:FORKHOME 'userdata\desktop-settings.json'; $j = [pscustomobject]@{}; if (Test-Path $p) { $j = Get-Content -Raw -Encoding UTF8 $p | ConvertFrom-Json; if ($null -eq $j) { exit 1 } }; $j | Add-Member -NotePropertyName localEnvironmentEnabled -NotePropertyValue $false -Force; [IO.File]::WriteAllText($p, ($j | ConvertTo-Json -Depth 20))" >nul 2>nul
+if not errorlevel 1 (
+  echo applied> "%FORKHOME%\remote-only-applied"
+  echo Этот компьютер теперь работает только через общий сервер.
+)
 exit /b 0
 
 :findtools
