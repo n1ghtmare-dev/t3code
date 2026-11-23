@@ -43,6 +43,8 @@ import * as ElectronApp from "../electron/ElectronApp.ts";
 import { m } from "../i18n/messages.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
 import { makeQuitShortcutHandler } from "./QuitHold.ts";
+import { installForkTray as installForkTrayIcon } from "./ForkTray.ts";
+import * as ForkWindowSession from "./ForkWindowSession.ts";
 import { copyContextMenuImage } from "./ContextMenuImage.ts";
 
 const TITLEBAR_HEIGHT = 40;
@@ -149,6 +151,8 @@ export class DesktopWindow extends Context.Service<
     readonly zoomMain: (direction: MainWindowZoomDirection) => Effect.Effect<void>;
     readonly runMainContentsCommand: (command: MainWindowContentsCommand) => Effect.Effect<void>;
     readonly syncAppearance: Effect.Effect<void>;
+    /** Fork-only: the tray icon with update and restart; does nothing outside the fork launcher. */
+    readonly installForkTray: Effect.Effect<void>;
   }
 >()("@t3tools/desktop/window/DesktopWindow") {}
 
@@ -413,6 +417,20 @@ export const make = Effect.gen(function* () {
   );
   let flushMainWindowBounds: Effect.Effect<void> = Effect.void;
 
+  // Fork-only window session: which windows were open, on which routes, so a restart reopens them.
+  const forkSessionPath = Option.isSome(environment.forkRepoPath)
+    ? environment.path.join(environment.stateDir, "fork-window-session.json")
+    : null;
+  let forkSession =
+    forkSessionPath === null
+      ? ForkWindowSession.EMPTY_FORK_WINDOW_SESSION
+      : ForkWindowSession.readForkWindowSession(forkSessionPath);
+  let forkSessionRestored = false;
+  const saveForkSession = (next: ForkWindowSession.ForkWindowSession) => {
+    forkSession = next;
+    if (forkSessionPath !== null) ForkWindowSession.writeForkWindowSession(forkSessionPath, next);
+  };
+
   const dismissConnectingSplash = Effect.gen(function* () {
     const splash = yield* Ref.getAndSet(splashWindowRef, Option.none());
     if (Option.isSome(splash) && !splash.value.isDestroyed()) {
@@ -471,13 +489,29 @@ export const make = Effect.gen(function* () {
   // A secondary window loads one app route beside the main window. It shares IPC trust and
   // server connections, but leaves bounds persistence and browser previews to the main window.
   const createWindow = Effect.fn("desktop.window.createWindow")(function* (
-    options: { readonly secondaryUrl?: string } = {},
+    options: {
+      readonly secondaryUrl?: string;
+      readonly slot?: string;
+      readonly bounds?: ForkWindowSession.ForkWindowBounds | null;
+    } = {},
   ): Effect.fn.Return<Option.Option<Electron.BrowserWindow>, DesktopWindowError> {
     if (yield* Ref.get(desktopState.quitting)) return Option.none();
     const isMain = options.secondaryUrl === undefined;
     yield* previewManager.getBrowserSession();
     const applicationUrl = getDesktopUrl(environment.isDevelopment);
-    const initialUrl = options.secondaryUrl ?? applicationUrl;
+    const slot = isMain
+      ? ForkWindowSession.MAIN_WINDOW_SLOT
+      : (options.slot ?? ForkWindowSession.newWindowSlot());
+    const savedMainUrl =
+      isMain &&
+      forkSession.mainUrl !== null &&
+      isSameOriginRendererNavigation({ applicationUrl, navigationUrl: forkSession.mainUrl })
+        ? forkSession.mainUrl
+        : null;
+    const baseUrl = options.secondaryUrl ?? savedMainUrl ?? applicationUrl;
+    // The slot keys this window's tabs in the renderer and its place in the window session.
+    const initialUrl =
+      forkSessionPath === null ? baseUrl : ForkWindowSession.withWindowSlot(baseUrl, slot);
     const iconPaths = yield* assets.iconPaths;
     const iconOption = getIconOption(iconPaths, environment.platform);
     const shouldUseDarkColors = yield* electronTheme.shouldUseDarkColors;
@@ -499,9 +533,15 @@ export const make = Effect.gen(function* () {
         : yield* logWindowWarning("failed to read connected displays; using defaults", {
             cause: displayBoundsResult.cause,
           }).pipe(Effect.as<readonly Electron.Rectangle[]>([]));
+    const savedSecondaryBounds =
+      !isMain &&
+      options.bounds != null &&
+      displayBounds.some((display) => windowFitsWithinDisplay(options.bounds!, display))
+        ? options.bounds
+        : null;
     const initialBounds = isMain
       ? resolveInitialMainWindowBounds(persistedBounds, displayBounds)
-      : yield* secondaryWindowBounds(displayBounds);
+      : (savedSecondaryBounds ?? (yield* secondaryWindowBounds(displayBounds)));
     const restoredPersistedBounds = persistedBounds !== null && initialBounds === persistedBounds;
     if (
       isMain &&
@@ -1088,6 +1128,50 @@ export const make = Effect.gen(function* () {
       window.webContents.openDevTools({ mode: "detach" });
     }
 
+    if (forkSessionPath !== null) {
+      let boundsRecordFiber: Fiber.Fiber<void, never> | undefined;
+      const recordWindow = () => {
+        if (window.isDestroyed()) return;
+        const url = window.webContents.getURL();
+        if (!isSameOriginRendererNavigation({ applicationUrl, navigationUrl: url })) return;
+        if (isMain) {
+          if (forkSession.mainUrl !== url) saveForkSession({ ...forkSession, mainUrl: url });
+          return;
+        }
+        const bounds =
+          window.isMaximized() || window.isFullScreen()
+            ? window.getNormalBounds()
+            : window.getBounds();
+        saveForkSession(ForkWindowSession.upsertForkWindow(forkSession, { slot, url, bounds }));
+      };
+      window.webContents.on("did-navigate", recordWindow);
+      window.webContents.on("did-navigate-in-page", recordWindow);
+      if (!isMain) {
+        saveForkSession(
+          ForkWindowSession.upsertForkWindow(forkSession, {
+            slot,
+            url: initialUrl,
+            bounds: savedSecondaryBounds,
+          }),
+        );
+        const scheduleRecord = () => {
+          if (boundsRecordFiber !== undefined) runFork(Fiber.interrupt(boundsRecordFiber));
+          boundsRecordFiber = runFork(
+            Effect.sleep(500).pipe(Effect.andThen(Effect.sync(recordWindow))),
+          );
+        };
+        window.on("move", scheduleRecord);
+        window.on("resize", scheduleRecord);
+        window.on("closed", () => {
+          if (boundsRecordFiber !== undefined) runFork(Fiber.interrupt(boundsRecordFiber));
+          // Quitting keeps the window for the next start; closing it yourself forgets it.
+          void runPromise(Ref.get(desktopState.quitting)).then((quitting) => {
+            if (!quitting) saveForkSession(ForkWindowSession.removeForkWindow(forkSession, slot));
+          });
+        });
+      }
+    }
+
     window.on("closed", () => {
       clearDevelopmentLoadRetry();
       if (!isMain) return;
@@ -1099,11 +1183,29 @@ export const make = Effect.gen(function* () {
     return Option.some(window);
   });
 
+  const restoreForkWindows = Effect.gen(function* () {
+    if (forkSessionPath === null || forkSessionRestored) return;
+    forkSessionRestored = true;
+    const applicationUrl = getDesktopUrl(environment.isDevelopment);
+    for (const entry of forkSession.windows) {
+      if (!isSameOriginRendererNavigation({ applicationUrl, navigationUrl: entry.url })) {
+        saveForkSession(ForkWindowSession.removeForkWindow(forkSession, entry.slot));
+        continue;
+      }
+      yield* createWindow({ secondaryUrl: entry.url, slot: entry.slot, bounds: entry.bounds }).pipe(
+        Effect.catch((error) =>
+          logWindowWarning("failed to reopen a saved window", { message: error.message }),
+        ),
+      );
+    }
+  });
+
   const createMain = Effect.gen(function* () {
     const window = yield* createWindow();
     if (Option.isSome(window)) {
       mainClosedDuringStartup = false;
       yield* logWindowInfo("main window created");
+      yield* restoreForkWindows;
     }
     return window;
   }).pipe(Effect.withSpan("desktop.window.createMain"));
@@ -1293,6 +1395,29 @@ export const make = Effect.gen(function* () {
       else if (command === "forceReload") webContents.reloadIgnoringCache();
       else webContents.toggleDevTools();
     }),
+    installForkTray: Effect.gen(function* () {
+      if (Option.isNone(environment.forkRepoPath)) return;
+      const icons = yield* assets.iconPaths;
+      const applicationUrl = getDesktopUrl(environment.isDevelopment);
+      installForkTrayIcon({
+        repoPath: environment.forkRepoPath.value,
+        iconPath: Option.getOrNull(environment.platform === "win32" ? icons.ico : icons.png),
+        appName: environment.displayName,
+        platform: environment.platform,
+        openMain: () => void runPromise(revealOrCreateMain.pipe(Effect.ignoreCause)),
+        newWindow: () =>
+          void runPromise(
+            createWindow({ secondaryUrl: applicationUrl }).pipe(
+              Effect.flatMap((window) =>
+                Option.isSome(window) ? electronWindow.reveal(window.value) : Effect.void,
+              ),
+              Effect.ignoreCause,
+            ),
+          ),
+        quit: () => void runPromise(electronApp.quit),
+      });
+      yield* logWindowInfo("fork tray installed");
+    }).pipe(Effect.withSpan("desktop.window.installForkTray")),
     syncAppearance: Effect.gen(function* () {
       const shouldUseDarkColors = yield* electronTheme.shouldUseDarkColors;
       yield* electronWindow.syncAllAppearance((window, { titleBarOverlay }) =>

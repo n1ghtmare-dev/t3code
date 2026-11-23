@@ -120,6 +120,7 @@ import {
 } from "../threadOwnership.logic";
 import {
   filterThreadsByMachine,
+  machineMenuLabels,
   resolveMachineFilter,
   toggleMachineFilter,
 } from "./sidebar/sidebarMachineFilter.logic";
@@ -3207,6 +3208,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       const api = readLocalApi();
                       if (!api) return;
                       const position = { x: event.clientX, y: event.clientY };
+                      const labels = machineMenuLabels(
+                        [...environmentLabelById],
+                        primaryEnvironmentId,
+                        gt("(this computer)"),
+                      );
                       void (async () => {
                         const clicked = await settlePromise(() =>
                           api.contextMenu.show(
@@ -3218,7 +3224,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               },
                               ...[...environmentLabelById].map(([environmentId, label], index) => ({
                                 id: `machine:${environmentId}`,
-                                label,
+                                label: labels.get(environmentId) ?? label,
                                 checked: machineFilter?.has(environmentId) ?? false,
                                 ...(index === 0 ? { separatorBefore: true } : {}),
                               })),

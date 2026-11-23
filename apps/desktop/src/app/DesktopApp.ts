@@ -410,6 +410,7 @@ const startup = Effect.gen(function* () {
   );
   yield* previewPasskeys.configure;
   yield* applicationMenu.configure;
+  yield* (yield* DesktopWindow.DesktopWindow).installForkTray;
   // Portal identity is prepared pre-ready; MIME helpers must not gate the backend or window.
   yield* linuxUrlHandler.register.pipe(Effect.forkScoped);
   yield* bootstrap(backendStarted).pipe(

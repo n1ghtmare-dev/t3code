@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { windowStateStorage } from "./appWindows";
 import { resolveStorage } from "./lib/storage";
 import {
   EMPTY_THREAD_WORKSPACE,
@@ -32,7 +33,10 @@ const pick = ({ tabs, splits, activeKey }: ThreadWorkspaceState): ThreadWorkspac
   activeKey,
 });
 
-// Each window keeps its own tabs and splits, so they live in sessionStorage.
+// Each window keeps its own tabs and splits: in sessionStorage, or keyed by the window's slot when
+// the desktop app reopens its windows after a restart.
+const WORKSPACE_STORAGE_KEY = "t3code:thread-workspace:v1";
+const workspacePlace = windowStateStorage(WORKSPACE_STORAGE_KEY);
 export const useThreadWorkspaceStore = create<ThreadWorkspaceStore>()(
   persist(
     (set, get) => ({
@@ -50,10 +54,8 @@ export const useThreadWorkspaceStore = create<ThreadWorkspaceStore>()(
       closeSplit: (key) => set((state) => closeThreadSplit(pick(state), key)),
     }),
     {
-      name: "t3code:thread-workspace:v1",
-      storage: createJSONStorage(() =>
-        resolveStorage(typeof window !== "undefined" ? window.sessionStorage : undefined),
-      ),
+      name: workspacePlace?.key ?? WORKSPACE_STORAGE_KEY,
+      storage: createJSONStorage(() => resolveStorage(workspacePlace?.storage)),
       version: 1,
       partialize: ({ tabs, splits }) => ({ tabs, splits }),
       merge: (persisted, current) => ({ ...current, ...sanitizeThreadWorkspace(persisted) }),

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   filterThreadsByMachine,
+  machineMenuLabels,
   resolveMachineFilter,
   toggleMachineFilter,
 } from "./sidebarMachineFilter.logic";
@@ -29,6 +30,25 @@ describe("toggleMachineFilter", () => {
     { stored: ["gone"], id: "work", expected: ["work"] },
   ])("$stored + $id", ({ stored, id, expected }) => {
     expect(toggleMachineFilter(stored, id, known)).toEqual(expected);
+  });
+});
+
+describe("machineMenuLabels", () => {
+  it("marks this device and tells machines with the same name apart", () => {
+    const labels = machineMenuLabels(
+      [
+        ["abcdef123", "BSQL"],
+        ["zyxwvu987", "BSQL"],
+        ["home-1", "WIN-HOME"],
+      ],
+      "zyxwvu987",
+      "(this computer)",
+    );
+    expect([...labels.values()]).toEqual([
+      "BSQL · abcdef",
+      "BSQL · zyxwvu (this computer)",
+      "WIN-HOME",
+    ]);
   });
 });
 

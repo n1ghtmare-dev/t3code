@@ -8,6 +8,34 @@ export const APP_WINDOW_TARGET_PREFIX = "t3code-window-";
 // sessionStorage, so scoping a project window never changes the main window's scope.
 export const WINDOW_PROJECT_SEARCH_PARAM = "windowProject";
 const WINDOW_SIDEBAR_SCOPE_STORAGE_KEY = "t3code:window-sidebar-scope";
+// The fork's desktop app names each window with a slot that survives restarts
+// (apps/desktop/src/window/ForkWindowSession.ts).
+const WINDOW_SLOT_SEARCH_PARAM = "windowSlot";
+
+/** This window's restart-stable slot, or null outside the fork's desktop app. */
+export function readWindowSlot(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const slot = new URLSearchParams(window.location.search).get(WINDOW_SLOT_SEARCH_PARAM);
+    return slot === null || slot.trim() === "" ? null : slot;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Where per-window state lives: sessionStorage normally, or localStorage keyed by the window's
+ * slot when the desktop app reopens windows after a restart.
+ */
+export function windowStateStorage(
+  key: string,
+): { readonly storage: Storage; readonly key: string } | null {
+  if (typeof window === "undefined") return null;
+  const slot = readWindowSlot();
+  return slot === null
+    ? { storage: window.sessionStorage, key }
+    : { storage: window.localStorage, key: `${key}:${slot}` };
+}
 
 const POPUP_DEFAULT_WIDTH = 1200;
 const POPUP_DEFAULT_HEIGHT = 820;
@@ -68,23 +96,18 @@ let windowSidebarScopeInitialized = false;
  * persisted scope (the main window, and every plain browser tab).
  */
 export function readWindowSidebarScope(): string[] | null {
-  if (typeof window === "undefined") return null;
+  const place = windowStateStorage(WINDOW_SIDEBAR_SCOPE_STORAGE_KEY);
+  if (place === null) return null;
   try {
     if (!windowSidebarScopeInitialized) {
       windowSidebarScopeInitialized = true;
       const projectKey = readWindowProjectParam(window.location.search);
       // A reload keeps the scope the user picked in this window.
-      if (
-        projectKey !== null &&
-        window.sessionStorage.getItem(WINDOW_SIDEBAR_SCOPE_STORAGE_KEY) === null
-      ) {
-        window.sessionStorage.setItem(
-          WINDOW_SIDEBAR_SCOPE_STORAGE_KEY,
-          JSON.stringify([projectKey]),
-        );
+      if (projectKey !== null && place.storage.getItem(place.key) === null) {
+        place.storage.setItem(place.key, JSON.stringify([projectKey]));
       }
     }
-    const raw = window.sessionStorage.getItem(WINDOW_SIDEBAR_SCOPE_STORAGE_KEY);
+    const raw = place.storage.getItem(place.key);
     return raw === null ? null : sanitizeScopeKeys(JSON.parse(raw));
   } catch {
     return null;
@@ -92,8 +115,9 @@ export function readWindowSidebarScope(): string[] | null {
 }
 
 export function writeWindowSidebarScope(keys: readonly string[]): void {
-  if (typeof window === "undefined") return;
+  const place = windowStateStorage(WINDOW_SIDEBAR_SCOPE_STORAGE_KEY);
+  if (place === null) return;
   try {
-    window.sessionStorage.setItem(WINDOW_SIDEBAR_SCOPE_STORAGE_KEY, JSON.stringify(keys));
+    place.storage.setItem(place.key, JSON.stringify(keys));
   } catch {}
 }

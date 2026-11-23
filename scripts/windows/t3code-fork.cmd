@@ -2,9 +2,10 @@
 rem T3 Code (fork n1ghtmare-dev): checks for an update, rebuilds when the code changed, then starts.
 rem git pull can rewrite this file, and cmd reads a running script from disk line by line,
 rem so the launcher first hands over to a copy in %TEMP%.
+rem The app's tray runs it with --wait-pid <pid> to update and restart after it quits.
 if /i not "%~1"=="--from-temp" (
   copy /y "%~f0" "%TEMP%\t3code-fork-launch.cmd" >nul
-  "%TEMP%\t3code-fork-launch.cmd" --from-temp "%~dp0"
+  "%TEMP%\t3code-fork-launch.cmd" --from-temp "%~dp0" %*
   exit /b
 )
 chcp 65001 >nul
@@ -14,6 +15,18 @@ set "BRANCH=feature/multi-window"
 set "FORKHOME=%USERPROFILE%\.t3-fork"
 title T3 Code (fork)
 
+set "WAITPID="
+if /i "%~3"=="--wait-pid" set "WAITPID=%~4"
+if not defined WAITPID goto :afterwait
+echo Жду, пока T3 Code закроется...
+:waitloop
+tasklist /FI "PID eq %WAITPID%" 2>nul | "%SystemRoot%\System32\find.exe" "%WAITPID%" >nul
+if not errorlevel 1 (
+  ping -n 2 127.0.0.1 >nul
+  goto :waitloop
+)
+:afterwait
+
 call :findtools
 where node >nul 2>nul
 if errorlevel 1 (
@@ -22,10 +35,17 @@ if errorlevel 1 (
   exit /b 1
 )
 cd /d "%REPO%" || exit /b 1
+set "REPO=%CD%"
 
 rem ---------- Проверка обновления ----------
 set "NEEDBUILD=0"
 if not exist "apps\desktop\dist-electron\main.cjs" set "NEEDBUILD=1"
+rem A running app (for example in the tray) keeps its files: rebuilding under it would break it.
+rem It updates itself from the tray instead, so just bring its window up.
+if not defined WAITPID (
+  powershell -NoProfile -Command "if (Get-Process electron -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ('%REPO%' + '\*') }) { exit 0 } else { exit 1 }" >nul 2>nul
+  if not errorlevel 1 goto :launch
+)
 where git >nul 2>nul
 if errorlevel 1 goto :launch
 echo Проверяю обновления...
@@ -68,6 +88,8 @@ if "!NEEDBUILD!"=="1" (
 rem Свои данные отдельно от официального T3 Code; без автообновления до официальной версии.
 set T3CODE_DISABLE_AUTO_UPDATE=1
 set "T3CODE_HOME=%FORKHOME%"
+rem Turns on the tray icon, updates from the tray and reopening windows after a restart.
+set "T3CODE_FORK_REPO=%REPO%"
 cd /d "%REPO%\apps\desktop"
 rem Официальный T3 Code должен быть закрыт: у них общий профиль окна.
 start "T3 Code" /min cmd /c "node scripts\start-electron.mjs"
