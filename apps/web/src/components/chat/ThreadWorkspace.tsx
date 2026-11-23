@@ -219,6 +219,8 @@ function ThreadSplitPane(props: { readonly threadKey: string }) {
   if (ref === null) return null;
 
   const parentPanel: SideChatParentPanel = {
+    // A split pane has no parent thread; it hosts itself.
+    hostRef: ref,
     openToolDiff: (target: ToolCallDiffTarget) => {
       useDiffPanelStore.getState().selectToolCall(ref, target);
       useRightPanelStore.getState().open(ref, "diff");
