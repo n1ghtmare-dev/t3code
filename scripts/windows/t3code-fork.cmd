@@ -46,6 +46,12 @@ if not defined WAITPID (
   powershell -NoProfile -Command "if (Get-Process electron -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ('%REPO%' + '\*') }) { exit 0 } else { exit 1 }" >nul 2>nul
   if not errorlevel 1 goto :launch
 )
+rem Source builds leave T3 Connect off without .env; .env.example holds the same public ids as
+rem official builds. Creating it needs a rebuild so the app picks them up.
+if not exist ".env" if exist ".env.example" (
+  copy /y ".env.example" ".env" >nul
+  set "NEEDBUILD=1"
+)
 where git >nul 2>nul
 if errorlevel 1 goto :launch
 echo Проверяю обновления...
