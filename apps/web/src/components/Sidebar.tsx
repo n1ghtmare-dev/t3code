@@ -73,6 +73,7 @@ import {
   ChevronDownIcon,
   FolderIcon,
   ListFilterIcon,
+  MonitorIcon,
   PlusIcon,
   SettingsIcon,
 } from "lucide-react";
@@ -107,6 +108,12 @@ import { isModelPickerOpen } from "../modelPickerVisibility";
 import { isMacPlatform } from "~/lib/utils";
 import { readLocalApi } from "../localApi";
 import { openAppWindow } from "../appWindows";
+import { contextMenuSourceOf } from "../contextMenuSource";
+import {
+  filterThreadsByMachine,
+  resolveMachineFilter,
+  toggleMachineFilter,
+} from "./sidebar/sidebarMachineFilter.logic";
 import { useOpenThreadInWorkspace } from "./chat/ThreadWorkspace";
 import { configuredHostedAppUrl } from "../hostedPairing";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
@@ -1029,7 +1036,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const threadSearchInputRef = useRef<HTMLInputElement>(null);
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
   const [searchHighlightKey, setSearchHighlightKey] = useState<string | null>(null);
-  const connectedEnvironmentIds = useConnectedEnvironmentIds();
+  const allConnectedEnvironmentIds = useConnectedEnvironmentIds();
+  // Several people can share one account; each device can list only its person's machines.
+  const storedMachineFilter = useUiStateStore((store) => store.sidebarMachineFilter);
+  const setStoredMachineFilter = useUiStateStore((store) => store.setSidebarMachineFilter);
+  const knownEnvironmentIds = new Set<string>(environmentLabelById.keys());
+  const machineFilter = resolveMachineFilter(storedMachineFilter, knownEnvironmentIds);
+  const connectedEnvironmentIds =
+    machineFilter === null
+      ? allConnectedEnvironmentIds
+      : allConnectedEnvironmentIds.filter((environmentId) => machineFilter.has(environmentId));
   const queuePendingFileDrop = useSidebarPendingFileDropStore((s) => s.queuePendingFileDrop);
   const clearPendingFileDrop = useSidebarPendingFileDropStore((s) => s.clearPendingFileDrop);
   const [renamingThreadRef, setRenamingThreadRef] = useState<ScopedThreadRef | null>(null);
@@ -1111,7 +1127,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             ),
           ),
         );
-  const threads = useQuietThreadShells();
+  const threads = filterThreadsByMachine(
+    useQuietThreadShells(),
+    machineFilter,
+    (thread) => threadShellKey(thread) === routeThreadKey,
+  );
   const promotingDraftThreadKeys = usePromotingDraftThreadKeys();
   const listedThreads =
     promotingDraftThreadKeys.length === 0
@@ -3038,6 +3058,69 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
               hasProjects={projectGroups.length > 0}
+              machineFilter={
+                knownEnvironmentIds.size > 1 ? (
+                  <SidebarHeaderIconButton
+                    label={
+                      machineFilter === null
+                        ? gt("Show threads from: all machines")
+                        : gt("Show threads from: {machines}", {
+                            machines: [...machineFilter]
+                              .map((id) => environmentLabelById.get(id as EnvironmentId) ?? id)
+                              .join(", "),
+                          })
+                    }
+                    className={machineFilter === null ? undefined : "text-primary"}
+                    onClick={(event) => {
+                      const api = readLocalApi();
+                      if (!api) return;
+                      const position = { x: event.clientX, y: event.clientY };
+                      void (async () => {
+                        const clicked = await settlePromise(() =>
+                          api.contextMenu.show(
+                            [
+                              {
+                                id: "all",
+                                label: gt("All machines"),
+                                checked: machineFilter === null,
+                              },
+                              ...[...environmentLabelById].map(([environmentId, label], index) => ({
+                                id: `machine:${environmentId}`,
+                                label,
+                                checked: machineFilter?.has(environmentId) ?? false,
+                                ...(index === 0 ? { separatorBefore: true } : {}),
+                              })),
+                            ],
+                            position,
+                            contextMenuSourceOf(event),
+                          ),
+                        );
+                        if (clicked._tag === "Failure" || clicked.value === null) return;
+                        clearSelection();
+                        if (clicked.value === "all") {
+                          setStoredMachineFilter([]);
+                        } else {
+                          setStoredMachineFilter(
+                            toggleMachineFilter(
+                              storedMachineFilter,
+                              clicked.value.slice("machine:".length),
+                              knownEnvironmentIds,
+                            ),
+                          );
+                        }
+                        scrollSidebarToTop(sidebarContentRef.current);
+                      })();
+                    }}
+                  >
+                    <MonitorIcon />
+                    {machineFilter === null ? null : (
+                      <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-primary text-[9px] leading-none font-semibold text-primary-foreground">
+                        {machineFilter.size}
+                      </span>
+                    )}
+                  </SidebarHeaderIconButton>
+                ) : null
+              }
               projectScope={
                 <Combobox
                   items={projectScopeItems}

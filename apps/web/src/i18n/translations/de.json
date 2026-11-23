@@ -12208,5 +12208,8 @@
   "b7a8465e4a5019e2": "Andere Tabs schließen",
   "b7415d9810e06821": "In den Hauptbereich verschoben",
   "01fa365ced3c9340": "Führe den Befehl im Hauptbereich erneut aus, dort ist das Terminal.",
-  "2f0259a5254a15ee": "Im Hauptbereich anzeigen"
+  "2f0259a5254a15ee": "Im Hauptbereich anzeigen",
+  "22cb163bf3214c11": "Threads anzeigen von: allen Rechnern",
+  "de81b063747a5988": "Threads anzeigen von: {machines}",
+  "d2f33544f6417238": "Alle Rechner"
 }

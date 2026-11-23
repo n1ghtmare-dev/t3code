@@ -12215,5 +12215,8 @@
   "b7a8465e4a5019e2": "Stäng andra flikar",
   "b7415d9810e06821": "Flyttad till huvudpanelen",
   "01fa365ced3c9340": "Kör kommandot igen från huvudpanelen, där terminalen finns.",
-  "2f0259a5254a15ee": "Visa i huvudpanelen"
+  "2f0259a5254a15ee": "Visa i huvudpanelen",
+  "22cb163bf3214c11": "Visa trådar från: alla datorer",
+  "de81b063747a5988": "Visa trådar från: {machines}",
+  "d2f33544f6417238": "Alla datorer"
 }

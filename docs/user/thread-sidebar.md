@@ -160,6 +160,15 @@ Pinned threads stay above the folders, and Snoozed and Settled stay below them. 
 can drag a thread onto the composer to mention it, but not within the sidebar, and the Working
 section is off. Each device keeps its own choice.
 
+### Show threads from some machines
+
+With more than one machine connected, the monitor button at the top of the sidebar picks which
+machines' threads to list. Check your own machines, for example your work and home computers when
+several people share one T3 Connect account. Click a machine to add or remove it, or **All
+machines** to list everything again. The button shows how many machines are chosen. Search
+follows the same choice. The thread you have open always stays listed. Each device keeps its own
+choice, so set it once on each of your devices.
+
 ## Settle finished work
 
 Choose **Settle thread** from its menu to move finished work out of the active list

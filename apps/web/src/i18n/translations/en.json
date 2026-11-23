@@ -12217,5 +12217,8 @@
   "b7a8465e4a5019e2": "Close other tabs",
   "b7415d9810e06821": "Moved to the main pane",
   "01fa365ced3c9340": "Run the command again from the main pane, where the terminal is.",
-  "2f0259a5254a15ee": "Show in the main pane"
+  "2f0259a5254a15ee": "Show in the main pane",
+  "22cb163bf3214c11": "Show threads from: all machines",
+  "de81b063747a5988": "Show threads from: {machines}",
+  "d2f33544f6417238": "All machines"
 }

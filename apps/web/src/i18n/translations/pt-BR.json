@@ -12207,5 +12207,8 @@
   "b7a8465e4a5019e2": "Fechar outras abas",
   "b7415d9810e06821": "Movido para o painel principal",
   "01fa365ced3c9340": "Execute o comando novamente no painel principal, onde fica o terminal.",
-  "2f0259a5254a15ee": "Mostrar no painel principal"
+  "2f0259a5254a15ee": "Mostrar no painel principal",
+  "22cb163bf3214c11": "Mostrar threads de: todas as máquinas",
+  "de81b063747a5988": "Mostrar threads de: {machines}",
+  "d2f33544f6417238": "Todas as máquinas"
 }

@@ -12208,5 +12208,8 @@
   "b7a8465e4a5019e2": "Fermer les autres onglets",
   "b7415d9810e06821": "Déplacé dans le volet principal",
   "01fa365ced3c9340": "Relancez la commande depuis le volet principal, où se trouve le terminal.",
-  "2f0259a5254a15ee": "Afficher dans le volet principal"
+  "2f0259a5254a15ee": "Afficher dans le volet principal",
+  "22cb163bf3214c11": "Afficher les fils de : toutes les machines",
+  "de81b063747a5988": "Afficher les fils de : {machines}",
+  "d2f33544f6417238": "Toutes les machines"
 }
