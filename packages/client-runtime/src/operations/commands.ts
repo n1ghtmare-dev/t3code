@@ -114,6 +114,10 @@ export interface PinThreadInput extends ThreadCommandInput {
   readonly orderKey?: string;
 }
 export type UnpinThreadInput = ThreadCommandInput;
+export interface SetThreadTagInput extends ThreadCommandInput {
+  readonly tag: string;
+  readonly tagged: boolean;
+}
 
 export interface ReorderPinnedThreadInput extends ThreadCommandInput {
   readonly orderKey: string;
@@ -582,6 +586,19 @@ export const pinThread = Effect.fn("EnvironmentCommands.pinThread")(function* (
     commandId,
     threadId: input.threadId,
     ...(input.orderKey === undefined ? {} : { orderKey: input.orderKey }),
+  });
+});
+
+/** Adds or removes one tag. Tags are free text on the thread, shared by every client. */
+export const setThreadTag = Effect.fn("EnvironmentCommands.setThreadTag")(function* (
+  input: SetThreadTagInput,
+) {
+  return yield* dispatch({
+    type: "thread.tag.set",
+    commandId: yield* allocateCommandId(input),
+    threadId: input.threadId,
+    tag: input.tag,
+    tagged: input.tagged,
   });
 });
 

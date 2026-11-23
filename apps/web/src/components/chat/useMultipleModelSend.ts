@@ -25,6 +25,7 @@ import { releaseDraftAttachments } from "../../lib/attachmentUploadQueue";
 import type { buildMessageContext } from "../../lib/composerContextRecords";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { threadEnvironment } from "../../state/threads";
+import { useTagThreadAsMine } from "../../hooks/useThreadOwnership";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { DEFAULT_INTERACTION_MODE } from "../../types";
@@ -79,6 +80,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     setThreadError,
   } = input;
   const navigate = useNavigate();
+  const tagThreadAsMine = useTagThreadAsMine();
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
   });
@@ -167,8 +169,8 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
             ]),
             model: target.selection.model,
             uncertainSubmissions: uncertainSubmissionsRef.current,
-            start: (targetThreadId) => {
-              return startThreadTurn({
+            start: async (targetThreadId) => {
+              const result = await startThreadTurn({
                 environmentId,
                 input: {
                   threadId: targetThreadId,
@@ -207,6 +209,8 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                   createdAt: createdAt,
                 },
               });
+              if (result._tag === "Success") tagThreadAsMine(environmentId, targetThreadId);
+              return result;
             },
             openThread: (threadId) =>
               void navigate({

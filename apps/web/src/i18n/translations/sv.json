@@ -12218,5 +12218,18 @@
   "2f0259a5254a15ee": "Visa i huvudpanelen",
   "22cb163bf3214c11": "Visa trådar från: alla datorer",
   "de81b063747a5988": "Visa trådar från: {machines}",
-  "d2f33544f6417238": "Alla datorer"
+  "d2f33544f6417238": "Alla datorer",
+  "484aec555bc92a35": "Markera som mina ({count})",
+  "3bde47ab479855ce": "Visa trådar av: alla",
+  "9076512303565838": "Visa trådar av: {name}",
+  "8f08682bcd630f53": "Alla",
+  "061b6ddc3c43a039": "Bara mina…",
+  "5c3998bd3f26c746": "Bara mina ({name})",
+  "6b1ab33bc1f6d367": "Ange mitt namn på den här enheten…",
+  "77b393be68efdecf": "Ändra mitt namn på den här enheten…",
+  "83ce299bd96ee18f": "Inte min tråd ({name})",
+  "58c7d8430e8f7c58": "Markera som min ({name})",
+  "636e0de7298e6951": "Ange ditt namn.",
+  "6ed704ee2a240030": "Ditt namn på den här enheten",
+  "619028d4ec2f3856": "Trådar du startar här märks med det här namnet, så att du kan visa bara dina trådar på alla enheter. Använd samma namn på jobb- och hemdatorn."
 }

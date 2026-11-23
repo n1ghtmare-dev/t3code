@@ -12206,5 +12206,18 @@
   "2f0259a5254a15ee": "Mostrar en el panel principal",
   "22cb163bf3214c11": "Mostrar hilos de: todas las máquinas",
   "de81b063747a5988": "Mostrar hilos de: {machines}",
-  "d2f33544f6417238": "Todas las máquinas"
+  "d2f33544f6417238": "Todas las máquinas",
+  "484aec555bc92a35": "Marcar como míos ({count})",
+  "3bde47ab479855ce": "Mostrar hilos de: todos",
+  "9076512303565838": "Mostrar hilos de: {name}",
+  "8f08682bcd630f53": "Todos",
+  "061b6ddc3c43a039": "Solo los míos…",
+  "5c3998bd3f26c746": "Solo los míos ({name})",
+  "6b1ab33bc1f6d367": "Indicar mi nombre en este dispositivo…",
+  "77b393be68efdecf": "Cambiar mi nombre en este dispositivo…",
+  "83ce299bd96ee18f": "No es mi hilo ({name})",
+  "58c7d8430e8f7c58": "Marcar como mío ({name})",
+  "636e0de7298e6951": "Escribe tu nombre.",
+  "6ed704ee2a240030": "Tu nombre en este dispositivo",
+  "619028d4ec2f3856": "Los hilos que inicies aquí se marcan con este nombre, para que puedas ver solo tus hilos en cualquier dispositivo. Usa el mismo nombre en tu equipo del trabajo y de casa."
 }

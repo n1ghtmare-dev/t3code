@@ -21,6 +21,8 @@ function makeUiState(overrides: Partial<UiState> = {}): UiState {
     projectOrder: [],
     sidebarProjectScopeKeys: [],
     sidebarMachineFilter: [],
+    threadOwnerName: null,
+    sidebarOwnerFilter: null,
     threadLastVisitedAtById: {},
     threadChangedFilesExpandedById: {},
     defaultAdvertisedEndpointKey: null,
@@ -128,6 +130,8 @@ describe("parsePersistedState", () => {
       defaultAdvertisedEndpointKey: "desktop-core:lan:http",
       sidebarProjectScopeKeys: [],
       sidebarMachineFilter: [],
+      threadOwnerName: null,
+      sidebarOwnerFilter: null,
       pullRequestMergeMethod: "merge",
       threadChangedFilesExpandedById: {
         "environment:thread-1": {
@@ -241,6 +245,8 @@ describe("uiStateStore persistence", () => {
       sidebarProjectScopeKeys: [],
       sidebarProjectScopeKey: null,
       sidebarMachineFilter: [],
+      threadOwnerName: null,
+      sidebarOwnerFilter: null,
       threadChangedFilesExpansionVersion: 2,
       threadChangedFilesExpandedById: {
         "environment:thread-1": {

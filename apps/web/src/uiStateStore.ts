@@ -32,6 +32,8 @@ export interface PersistedUiState {
   sidebarProjectScopeKey?: string | null;
   sidebarProjectScopeKeys?: string[];
   sidebarMachineFilter?: string[];
+  threadOwnerName?: string | null;
+  sidebarOwnerFilter?: string | null;
   threadChangedFilesExpansionVersion?: number;
   threadChangedFilesExpandedById?: Record<string, Record<string, boolean>>;
   pullRequestMergeMethod?: string;
@@ -43,6 +45,10 @@ export interface UiProjectState {
   sidebarProjectScopeKeys: string[];
   /** Environments whose threads the sidebar lists on this device; empty lists every machine. */
   sidebarMachineFilter: string[];
+  /** The person using this device; threads it starts are tagged with this name. */
+  threadOwnerName: string | null;
+  /** List only this person's threads; null lists everyone's. */
+  sidebarOwnerFilter: string | null;
 }
 
 export interface UiThreadState {
@@ -66,6 +72,8 @@ const initialState: UiState = {
   projectOrder: [],
   sidebarProjectScopeKeys: [],
   sidebarMachineFilter: [],
+  threadOwnerName: null,
+  sidebarOwnerFilter: null,
   threadLastVisitedAtById: {},
   threadChangedFilesExpandedById: {},
   defaultAdvertisedEndpointKey: null,
@@ -160,6 +168,8 @@ export function parsePersistedState(parsed: PersistedUiState): UiState {
       parsed.sidebarProjectScopeKeys ?? [parsed.sidebarProjectScopeKey],
     ),
     sidebarMachineFilter: sanitizeStringArray(parsed.sidebarMachineFilter),
+    threadOwnerName: sanitizeOptionalKey(parsed.threadOwnerName),
+    sidebarOwnerFilter: sanitizeOptionalKey(parsed.sidebarOwnerFilter),
     pullRequestMergeMethod: isPullRequestMergeMethod(parsed.pullRequestMergeMethod)
       ? parsed.pullRequestMergeMethod
       : initialState.pullRequestMergeMethod,
@@ -245,6 +255,8 @@ export function persistState(state: UiState): void {
         sidebarProjectScopeKey:
           sidebarProjectScopeKeys.length === 1 ? (sidebarProjectScopeKeys[0] ?? null) : null,
         sidebarMachineFilter: state.sidebarMachineFilter,
+        threadOwnerName: state.threadOwnerName,
+        sidebarOwnerFilter: state.sidebarOwnerFilter,
         threadChangedFilesExpansionVersion: THREAD_CHANGED_FILES_EXPANSION_VERSION,
         threadChangedFilesExpandedById: state.threadChangedFilesExpandedById,
         pullRequestMergeMethod: state.pullRequestMergeMethod,
@@ -458,6 +470,8 @@ interface UiStateStore extends UiState {
   setDefaultAdvertisedEndpointKey: (key: string | null) => void;
   setSidebarProjectScopeKeys: (projectKeys: readonly string[]) => void;
   setSidebarMachineFilter: (environmentIds: readonly string[]) => void;
+  setThreadOwnerName: (name: string | null) => void;
+  setSidebarOwnerFilter: (owner: string | null) => void;
   setPullRequestMergeMethod: (method: PullRequestMergeMethod) => void;
   setProjectExpanded: (projectIds: string | readonly string[], expanded: boolean) => void;
   reorderProjects: (
@@ -481,6 +495,12 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
     set((state) => setSidebarProjectScopeKeys(state, projectKeys)),
   setSidebarMachineFilter: (environmentIds) =>
     set((state) => setSidebarMachineFilter(state, environmentIds)),
+  setThreadOwnerName: (name) =>
+    set((state) => (state.threadOwnerName === name ? state : { ...state, threadOwnerName: name })),
+  setSidebarOwnerFilter: (owner) =>
+    set((state) =>
+      state.sidebarOwnerFilter === owner ? state : { ...state, sidebarOwnerFilter: owner },
+    ),
   setPullRequestMergeMethod: (method) => set((state) => setPullRequestMergeMethod(state, method)),
   setProjectExpanded: (projectIds, expanded) =>
     set((state) => setProjectExpanded(state, projectIds, expanded)),

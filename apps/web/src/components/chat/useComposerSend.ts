@@ -121,6 +121,7 @@ import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { fileAttachmentCapabilityBlockReason } from "./composerAttachmentFiles";
 import { useLinkedEnvironments } from "../../state/peerLinks";
 import { readEnvironmentScope } from "../../state/session";
+import { useTagThreadAsMine } from "../../hooks/useThreadOwnership";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import {
   ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
@@ -377,6 +378,7 @@ export function useComposerSend(input: ComposerSendInput) {
   const startThreadTurn = useOrchestrationCommand(threadEnvironment.startTurn, {
     reportFailure: false,
   });
+  const tagThreadAsMine = useTagThreadAsMine();
   const uploadThreadFeedback = useOrchestrationCommand(threadEnvironment.uploadFeedback, {
     reportFailure: false,
   });
@@ -1530,6 +1532,8 @@ export function useComposerSend(input: ComposerSendInput) {
         failure = startResult;
       } else {
         turnStartSucceeded = true;
+        // A thread this device just created belongs to this device's person.
+        if (isLocalDraftThread) tagThreadAsMine(environmentId, threadIdForSend);
         if (checkoutPullRequestUrl) {
           linkCheckoutPullRequest(
             scopeThreadRef(environmentId, threadIdForSend),

@@ -9,6 +9,8 @@ export type ThreadActionMenuId =
   | "open-in-new-window"
   | "open-in-new-tab"
   | "open-in-split"
+  | "mark-mine"
+  | "unmark-mine"
   | "new-thread-on-branch"
   | "filter-by-project"
   | "turn-into-project"
@@ -101,6 +103,8 @@ export interface ThreadActionMenuState {
   readonly canFind?: boolean;
   /** The thread already fills this window's main pane, so tab and split entries are hidden. */
   readonly isOpenHere?: boolean;
+  /** This device's person, when it has a name; offers marking the thread as theirs. */
+  readonly owner?: { readonly name: string; readonly isMine: boolean } | null;
   /** False where no inline title editor is rendered, such as sidebar search results. */
   readonly canRename?: boolean;
   readonly branch: string | null;
@@ -243,6 +247,21 @@ export function buildThreadActionMenuItems(
         ]
       : []),
     { id: "mark-unread", label: resolve(msg("Mark unread")), icon: "mail-open" },
+    ...(state.owner
+      ? [
+          state.owner.isMine
+            ? {
+                id: "unmark-mine" as const,
+                label: resolve(msg("Not my thread ({name})", { name: state.owner.name })),
+                icon: "user",
+              }
+            : {
+                id: "mark-mine" as const,
+                label: resolve(msg("Mark as mine ({name})", { name: state.owner.name })),
+                icon: "user",
+              },
+        ]
+      : []),
     ...(state.canShareWithGuest
       ? [{ id: "share-guest" as const, label: resolve(msg("Share with guest")), icon: "user-plus" }]
       : []),

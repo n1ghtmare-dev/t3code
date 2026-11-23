@@ -12211,5 +12211,18 @@
   "2f0259a5254a15ee": "Afficher dans le volet principal",
   "22cb163bf3214c11": "Afficher les fils de : toutes les machines",
   "de81b063747a5988": "Afficher les fils de : {machines}",
-  "d2f33544f6417238": "Toutes les machines"
+  "d2f33544f6417238": "Toutes les machines",
+  "484aec555bc92a35": "Marquer comme les miens ({count})",
+  "3bde47ab479855ce": "Afficher les fils de : tout le monde",
+  "9076512303565838": "Afficher les fils de : {name}",
+  "8f08682bcd630f53": "Tout le monde",
+  "061b6ddc3c43a039": "Seulement les miens…",
+  "5c3998bd3f26c746": "Seulement les miens ({name})",
+  "6b1ab33bc1f6d367": "Définir mon nom sur cet appareil…",
+  "77b393be68efdecf": "Changer mon nom sur cet appareil…",
+  "83ce299bd96ee18f": "Pas mon fil ({name})",
+  "58c7d8430e8f7c58": "Marquer comme le mien ({name})",
+  "636e0de7298e6951": "Saisissez votre nom.",
+  "6ed704ee2a240030": "Votre nom sur cet appareil",
+  "619028d4ec2f3856": "Les fils que vous lancez ici sont marqués avec ce nom, pour n’afficher que vos fils sur n’importe quel appareil. Utilisez le même nom sur vos ordinateurs du bureau et de la maison."
 }

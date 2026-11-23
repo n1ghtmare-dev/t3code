@@ -18,6 +18,8 @@ export interface SidebarThreadHeaderProps {
   projectScope: ReactNode;
   /** Chooses which machines' threads to list; null with a single machine. */
   machineFilter?: ReactNode;
+  /** Chooses whose threads to list, for people sharing one account. */
+  ownerFilter?: ReactNode;
   onNewProject: () => void;
   onNewThread: (event: ReactMouseEvent) => void;
   newThreadDisabled: boolean;
@@ -38,6 +40,7 @@ export function SidebarThreadHeader({
   hasProjects,
   projectScope,
   machineFilter = null,
+  ownerFilter = null,
   onNewProject,
   onNewThread,
   newThreadDisabled,
@@ -102,6 +105,7 @@ export function SidebarThreadHeader({
         ) : null}
       </div>
       <div className="flex shrink-0 items-center">
+        {ownerFilter}
         {machineFilter}
         {hasProjects ? (
           <>

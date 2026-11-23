@@ -12210,5 +12210,18 @@
   "2f0259a5254a15ee": "Mostrar no painel principal",
   "22cb163bf3214c11": "Mostrar threads de: todas as máquinas",
   "de81b063747a5988": "Mostrar threads de: {machines}",
-  "d2f33544f6417238": "Todas as máquinas"
+  "d2f33544f6417238": "Todas as máquinas",
+  "484aec555bc92a35": "Marcar como meus ({count})",
+  "3bde47ab479855ce": "Mostrar threads de: todos",
+  "9076512303565838": "Mostrar threads de: {name}",
+  "8f08682bcd630f53": "Todos",
+  "061b6ddc3c43a039": "Só os meus…",
+  "5c3998bd3f26c746": "Só os meus ({name})",
+  "6b1ab33bc1f6d367": "Definir meu nome neste dispositivo…",
+  "77b393be68efdecf": "Alterar meu nome neste dispositivo…",
+  "83ce299bd96ee18f": "Não é minha thread ({name})",
+  "58c7d8430e8f7c58": "Marcar como minha ({name})",
+  "636e0de7298e6951": "Digite seu nome.",
+  "6ed704ee2a240030": "Seu nome neste dispositivo",
+  "619028d4ec2f3856": "As threads que você inicia aqui são marcadas com este nome, para você ver só as suas em qualquer dispositivo. Use o mesmo nome no computador do trabalho e de casa."
 }

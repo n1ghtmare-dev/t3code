@@ -74,6 +74,7 @@ import {
   FolderIcon,
   ListFilterIcon,
   MonitorIcon,
+  UserIcon,
   PlusIcon,
   SettingsIcon,
 } from "lucide-react";
@@ -109,6 +110,14 @@ import { isMacPlatform } from "~/lib/utils";
 import { readLocalApi } from "../localApi";
 import { openAppWindow } from "../appWindows";
 import { contextMenuSourceOf } from "../contextMenuSource";
+import { requestThreadOwnerName } from "./ThreadOwnerNameDialog";
+import { useSetThreadOwner } from "../hooks/useThreadOwnership";
+import {
+  filterThreadsByOwner,
+  knownThreadOwners,
+  ownerTagFor,
+  ownersOfThread,
+} from "../threadOwnership.logic";
 import {
   filterThreadsByMachine,
   resolveMachineFilter,
@@ -378,6 +387,8 @@ interface SidebarThreadPartitionInput {
   // tracker's expiry version are inputs: a new key repartitions.
   readonly clockKey: string;
 }
+
+const threadShellTags = (thread: Pick<EnvironmentThreadShell, "source">) => thread.source.tags;
 
 function scrollSidebarToTop(content: HTMLElement | null) {
   content?.closest("[data-slot=scroll-area-viewport]")?.scrollTo({ top: 0 });
@@ -1127,10 +1138,20 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             ),
           ),
         );
-  const threads = filterThreadsByMachine(
-    useQuietThreadShells(),
-    machineFilter,
-    (thread) => threadShellKey(thread) === routeThreadKey,
+  const allThreadShells = useQuietThreadShells();
+  // People sharing one account see only their own threads: owners are tags on the thread.
+  const threadOwnerName = useUiStateStore((store) => store.threadOwnerName);
+  const setThreadOwnerName = useUiStateStore((store) => store.setThreadOwnerName);
+  const ownerFilter = useUiStateStore((store) => store.sidebarOwnerFilter);
+  const setOwnerFilter = useUiStateStore((store) => store.setSidebarOwnerFilter);
+  const setThreadOwner = useSetThreadOwner();
+  const isRouteThread = (thread: (typeof allThreadShells)[number]) =>
+    threadShellKey(thread) === routeThreadKey;
+  const threads = filterThreadsByOwner(
+    filterThreadsByMachine(allThreadShells, machineFilter, isRouteThread),
+    ownerFilter,
+    threadShellTags,
+    isRouteThread,
   );
   const promotingDraftThreadKeys = usePromotingDraftThreadKeys();
   const listedThreads =
@@ -2426,6 +2447,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 ]
               : []),
             { id: "mark-unread", label: gt("Mark unread ({count})", { count }) },
+            ...(threadOwnerName === null
+              ? []
+              : [
+                  {
+                    id: "mark-mine",
+                    label: gt("Mark as mine ({count})", { count }),
+                    disabled: !canOperateThreads(selectedThreads),
+                  },
+                ]),
             {
               id: "delete",
               label: gt("Delete ({count})", { count }),
@@ -2496,6 +2526,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               }),
             );
           }
+        }
+        return;
+      }
+      if (clicked.value === "mark-mine") {
+        const owner = useUiStateStore.getState().threadOwnerName;
+        clearSelection();
+        if (owner === null) return;
+        for (const thread of selectedThreads) {
+          void setThreadOwner(thread.environmentId, thread.id, owner, true);
         }
         return;
       }
@@ -2703,6 +2742,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               ),
               branch: thread.branch ?? null,
               isOpenHere: threadKey === routeThreadKey,
+              owner:
+                threadOwnerName === null
+                  ? null
+                  : {
+                      name: threadOwnerName,
+                      isMine: ownersOfThread(threadShellTags(thread)).includes(threadOwnerName),
+                    },
               // An archived project is not a filter choice.
               projectFilter:
                 threadProjectGroup && !threadProjectGroup.archived
@@ -2768,6 +2814,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             return;
           case "open-in-split":
             threadWorkspace.openInSplit(threadRef);
+            return;
+          case "mark-mine":
+          case "unmark-mine":
+            if (threadOwnerName !== null) {
+              void setThreadOwner(
+                threadRef.environmentId,
+                threadRef.threadId,
+                threadOwnerName,
+                clicked.value === "mark-mine",
+              );
+            }
             return;
           case "filter-by-project":
             if (threadProjectGroup) {
@@ -3058,6 +3115,81 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           <SidebarGroup className="z-[1]">
             <SidebarThreadHeader
               hasProjects={projectGroups.length > 0}
+              ownerFilter={
+                <SidebarHeaderIconButton
+                  label={
+                    ownerFilter === null
+                      ? gt("Show threads by: everyone")
+                      : gt("Show threads by: {name}", { name: ownerFilter })
+                  }
+                  className={ownerFilter === null ? undefined : "text-primary"}
+                  onClick={(event) => {
+                    const api = readLocalApi();
+                    if (!api) return;
+                    const position = { x: event.clientX, y: event.clientY };
+                    const others = knownThreadOwners(allThreadShells, threadShellTags).filter(
+                      (owner) => owner !== threadOwnerName,
+                    );
+                    void (async () => {
+                      const clicked = await settlePromise(() =>
+                        api.contextMenu.show(
+                          [
+                            { id: "all", label: gt("Everyone"), checked: ownerFilter === null },
+                            {
+                              id: "mine",
+                              label:
+                                threadOwnerName === null
+                                  ? gt("Only mine…")
+                                  : gt("Only mine ({name})", { name: threadOwnerName }),
+                              checked: ownerFilter !== null && ownerFilter === threadOwnerName,
+                            },
+                            ...others.map((owner, index) => ({
+                              id: `owner:${owner}`,
+                              label: owner,
+                              checked: ownerFilter === owner,
+                              ...(index === 0 ? { separatorBefore: true } : {}),
+                            })),
+                            {
+                              id: "rename",
+                              label:
+                                threadOwnerName === null
+                                  ? gt("Set my name on this device…")
+                                  : gt("Change my name on this device…"),
+                              separatorBefore: true,
+                            },
+                          ],
+                          position,
+                          contextMenuSourceOf(event),
+                        ),
+                      );
+                      if (clicked._tag === "Failure" || clicked.value === null) return;
+                      if (clicked.value === "all") {
+                        setOwnerFilter(null);
+                      } else if (clicked.value.startsWith("owner:")) {
+                        setOwnerFilter(clicked.value.slice("owner:".length));
+                      } else {
+                        let name = threadOwnerName;
+                        if (clicked.value === "rename" || name === null) {
+                          name = await requestThreadOwnerName(threadOwnerName);
+                          if (name === null) return;
+                          setThreadOwnerName(name);
+                        }
+                        // Renaming keeps a mine-only list on the new name.
+                        if (
+                          clicked.value === "mine" ||
+                          (ownerFilter !== null && ownerFilter === threadOwnerName)
+                        ) {
+                          setOwnerFilter(name);
+                        }
+                      }
+                      clearSelection();
+                      scrollSidebarToTop(sidebarContentRef.current);
+                    })();
+                  }}
+                >
+                  <UserIcon />
+                </SidebarHeaderIconButton>
+              }
               machineFilter={
                 knownEnvironmentIds.size > 1 ? (
                   <SidebarHeaderIconButton

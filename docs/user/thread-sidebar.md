@@ -160,6 +160,17 @@ Pinned threads stay above the folders, and Snoozed and Settled stay below them. 
 can drag a thread onto the composer to mention it, but not within the sidebar, and the Working
 section is off. Each device keeps its own choice.
 
+### Show only your threads
+
+When several people share one T3 Connect account, the person button at the top of the sidebar
+lists only one person's threads. Choose **Only mine…** and enter your name once on each of your
+devices, using the same name everywhere. Threads you start on that device are then tagged
+`by:<your name>` on the server, so your work and home computers both find them. **Everyone**
+lists every thread again, and the names of other people who use tags appear in the same menu.
+Older threads have no owner yet: right-click one and choose **Mark as mine**, or select several
+and mark them together. **Not my thread** removes the tag. The thread you have open always stays
+listed.
+
 ### Show threads from some machines
 
 With more than one machine connected, the monitor button at the top of the sidebar picks which
