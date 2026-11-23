@@ -1,0 +1,122 @@
+# Fork-only: keeps n1ghtmare-dev/t3code current with the official T3 Code.
+# Every night it merges pingdotgg/t3code main into the fork branch, checks that the fork's
+# features still typecheck and pass their tests, and pushes. The fork's Windows launcher and
+# tray then install the result on every computer. When a merge conflicts or a check fails, it
+# pushes nothing and opens an issue, so the fork never ships a broken build.
+name: Fork · sync upstream
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: fork-sync-upstream
+  cancel-in-progress: false
+
+env:
+  FORK_BRANCH: feature/multi-window
+
+jobs:
+  sync:
+    if: github.repository == 'n1ghtmare-dev/t3code'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FORK_BRANCH }}
+          fetch-depth: 0
+
+      - name: Merge upstream main
+        id: merge
+        shell: bash
+        run: |
+          git config user.name "n1ghtmare-dev"
+          git config user.email "82060888+n1ghtmare-dev@users.noreply.github.com"
+          git remote add upstream https://github.com/pingdotgg/t3code.git
+          git fetch --no-tags upstream main
+          echo "upstream=$(git rev-parse --short upstream/main)" >> "$GITHUB_OUTPUT"
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "status=up-to-date" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git merge --no-edit upstream/main; then
+            echo "status=merged" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Translation catalogs conflict on almost every merge; the fork's keys are re-added.
+          node scripts/fork/merge-translations.mjs
+          conflicts="$(git diff --name-only --diff-filter=U)"
+          if [ -n "$conflicts" ]; then
+            {
+              echo "status=conflict"
+              echo "files<<EOF"
+              echo "$conflicts"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            git merge --abort
+            exit 0
+          fi
+          git commit --no-edit
+          echo "status=merged" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Vite+
+        if: steps.merge.outputs.status == 'merged'
+        uses: ./.github/actions/setup-ci-deps
+
+      - name: Typecheck the fork's packages
+        if: steps.merge.outputs.status == 'merged'
+        run: vp run --filter @t3tools/client-runtime --filter @t3tools/web --filter @t3tools/desktop typecheck
+
+      - name: Test the fork's features
+        if: steps.merge.outputs.status == 'merged'
+        shell: bash
+        run: |
+          (cd apps/web && vp test run --project unit \
+            src/appWindows.test.ts \
+            src/threadWorkspace.logic.test.ts \
+            src/threadOwnership.logic.test.ts \
+            src/uiStateStore.test.ts \
+            src/components/threadActionMenu.logic.test.ts \
+            src/components/sidebar/sidebarMachineFilter.logic.test.ts)
+          (cd apps/desktop && vp test run \
+            src/window/ForkWindowSession.test.ts \
+            src/window/RemoteRequestHeaders.test.ts \
+            src/window/DesktopWindow.test.ts \
+            src/ipc/DesktopIpc.test.ts \
+            src/ipc/methods/window.test.ts)
+
+      - name: Push
+        if: steps.merge.outputs.status == 'merged'
+        run: git push origin "HEAD:${FORK_BRANCH}"
+
+      - name: Report a sync that needs a person
+        if: always() && (steps.merge.outputs.status == 'conflict' || failure())
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ steps.merge.outputs.status }}
+          FILES: ${{ steps.merge.outputs.files }}
+          UPSTREAM: ${{ steps.merge.outputs.upstream }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          if [ "$STATUS" = "conflict" ]; then
+            reason="Официальный T3 Code (${UPSTREAM}) не слился автоматически, конфликт в файлах:"
+            details="$(printf '```\n%s\n```' "$FILES")"
+          else
+            reason="Официальный T3 Code (${UPSTREAM}) слился, но проверка форка не прошла (типы или тесты)."
+            details=""
+          fi
+          body="$(printf '%s\n\n%s\n\nОбновление не установлено, у всех работает прошлая версия форка. Попросите Claude слить upstream и разобраться.\n\nЗапуск: %s\n' "$reason" "$details" "$RUN_URL")"
+          gh label create fork-sync --color D93F0B --description "Fork upstream sync needs attention" 2>/dev/null || true
+          existing="$(gh issue list --label fork-sync --state open --json number --jq '.[0].number')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --label fork-sync --title "Нужно вручную обновить форк до официального T3 Code" --body "$body"
+          fi
