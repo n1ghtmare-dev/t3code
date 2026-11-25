@@ -42,7 +42,7 @@ describe("filterThreadsByOwner", () => {
     { id: "c", tags: undefined },
   ];
 
-  it("keeps the owner's threads and the open thread", () => {
+  it("keeps the owner's threads and an unowned open thread", () => {
     expect(
       filterThreadsByOwner(
         threads,
@@ -51,6 +51,17 @@ describe("filterThreadsByOwner", () => {
         (thread) => thread.id === "c",
       ).map((thread) => thread.id),
     ).toEqual(["a", "c"]);
+  });
+
+  it("hides the open thread when someone else owns it", () => {
+    expect(
+      filterThreadsByOwner(
+        threads,
+        "Маша",
+        (thread) => thread.tags,
+        (thread) => thread.id === "a",
+      ).map((thread) => thread.id),
+    ).toEqual(["b"]);
   });
 
   it("lists every thread without an owner filter", () => {

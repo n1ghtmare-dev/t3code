@@ -52,7 +52,7 @@ import { installMainWindowRemoteRequestHeaderPolicy } from "./RemoteRequestHeade
 const TITLEBAR_HEIGHT = 40;
 // The web app opens extra windows with window.open(url, APP_WINDOW_TARGET_PREFIX + id);
 // apps/web/src/appWindows.ts uses the same prefix.
-export const APP_WINDOW_TARGET_PREFIX = "t3code-window-";
+const APP_WINDOW_TARGET_PREFIX = "t3code-window-";
 const SECONDARY_WINDOW_CASCADE_PX = 32;
 
 class ContextMenuImageCopyError extends Schema.TaggedError<ContextMenuImageCopyError>()(

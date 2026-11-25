@@ -2,7 +2,7 @@
 // once; threads it starts get the tag `by:<name>`. Tags live on the thread on the server, so
 // every device sees the same owners and a person's filter works on all their devices.
 
-export const OWNER_TAG_PREFIX = "by:";
+const OWNER_TAG_PREFIX = "by:";
 // Server tags hold at most 64 characters.
 const MAX_TAG_LENGTH = 64;
 
@@ -36,8 +36,9 @@ export function knownThreadOwners<T>(
 }
 
 /**
- * Keeps the threads tagged with `owner`, or every thread for a null owner. The open thread
- * always stays listed, so a link to someone else's thread still shows where you are.
+ * Keeps the threads tagged with `owner`, or every thread for a null owner. The open thread stays
+ * listed only while nobody owns it yet (a thread just started, before its tag lands), so switching
+ * to another person never leaves your own open thread in their list.
  */
 export function filterThreadsByOwner<T>(
   threads: readonly T[],
@@ -48,5 +49,9 @@ export function filterThreadsByOwner<T>(
   if (owner === null) return threads;
   const tag = ownerTagFor(owner);
   if (tag === null) return threads;
-  return threads.filter((thread) => (tagsOf(thread) ?? []).includes(tag) || isOpenThread(thread));
+  return threads.filter((thread) => {
+    const tags = tagsOf(thread) ?? [];
+    if (tags.includes(tag)) return true;
+    return isOpenThread(thread) && ownersOfThread(tags).length === 0;
+  });
 }

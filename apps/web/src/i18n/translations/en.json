@@ -3208,10 +3208,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "on the computer that opened this page"
-      ]
+      "c": [" ", "on the computer that opened this page"]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3223,10 +3220,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· whoever runs it gets this access"
-      ]
+      "c": [" ", "· whoever runs it gets this access"]
     }
   ],
   "c54cc9c75db9dc58": "Only approve a sign-in you just started.",
@@ -12807,6 +12801,7 @@
   "449aa94a550859c6": "Open project in new window",
   "d4ece5c971d4b3e8": "Open in new tab",
   "1df072b6acb2feef": "Open in split view",
+  "48f27f37056264cf": "Open here",
   "e767812b3ea33ec3": "Open threads",
   "91f13ad9b788f8d5": "Close split view",
   "b7a8465e4a5019e2": "Close other tabs",

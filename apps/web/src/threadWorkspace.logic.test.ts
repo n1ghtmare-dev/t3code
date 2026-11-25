@@ -7,9 +7,11 @@ import {
   closeOtherThreadTabs,
   closeThreadTab,
   deactivateThread,
+  moveThreadTab,
   openThreadSplit,
   openThreadTab,
   sanitizeThreadWorkspace,
+  threadTabsInGroup,
   type ThreadWorkspaceState,
 } from "./threadWorkspace.logic";
 
@@ -115,5 +117,52 @@ describe("sanitizeThreadWorkspace", () => {
       sanitizeThreadWorkspace({ tabs: ["a", "a", 3, ""], splits: ["b"], activeKey: "a" }),
     ).toEqual(workspace({ tabs: ["a"], splits: ["b"] }));
     expect(sanitizeThreadWorkspace(null)).toEqual(EMPTY_THREAD_WORKSPACE);
+  });
+});
+
+describe("tabs by project", () => {
+  // a* threads belong to project A, b* threads to project B.
+  const groupOf = (key: string) => key.charAt(0).toUpperCase();
+
+  it("plain navigation into another project keeps the current project's tab", () => {
+    const state = workspace({ tabs: ["a1", "b1"], activeKey: "a1" });
+    expect(activateThread(state, "b2", groupOf)).toEqual(
+      workspace({ tabs: ["a1", "b1", "b2"], activeKey: "b2" }),
+    );
+    expect(activateThread(state, "a2", groupOf).tabs).toEqual(["a2", "b1"]);
+  });
+
+  it("a new tab joins the end of its project's tabs", () => {
+    const state = workspace({ tabs: ["a1", "b1", "a2"], activeKey: "b1" });
+    expect(openThreadTab(state, "a3", groupOf).tabs).toEqual(["a1", "b1", "a2", "a3"]);
+    expect(threadTabsInGroup(["a1", "b1", "a2"], "A", groupOf)).toEqual(["a1", "a2"]);
+  });
+
+  it("closing the open tab moves to a tab of the same project", () => {
+    const state = workspace({ tabs: ["a1", "a2", "b1"], activeKey: "a2" });
+    expect(closeThreadTab(state, "a2", groupOf).next).toBe("a1");
+    expect(
+      closeThreadTab(workspace({ tabs: ["a1", "b1"], activeKey: "a1" }), "a1", groupOf).next,
+    ).toBeNull();
+  });
+
+  it("closing other tabs leaves other projects alone", () => {
+    const state = workspace({ tabs: ["a1", "b1", "a2"], splits: ["a2", "b1"], activeKey: "a1" });
+    expect(closeOtherThreadTabs(state, "a1", groupOf)).toEqual(
+      workspace({ tabs: ["a1", "b1"], splits: ["b1"], activeKey: "a1" }),
+    );
+  });
+});
+
+describe("moveThreadTab", () => {
+  it.each([
+    { key: "c", target: "a", side: "before" as const, tabs: ["c", "a", "b"] },
+    { key: "a", target: "c", side: "after" as const, tabs: ["b", "c", "a"] },
+    { key: "a", target: "b", side: "before" as const, tabs: ["a", "b", "c"] },
+  ])("moves $key $side $target", ({ key, target, side, tabs }) => {
+    const state = workspace({ tabs: ["a", "b", "c"] });
+    const moved = moveThreadTab(state, key, target, side);
+    expect(moved.tabs).toEqual(tabs);
+    if (tabs.join() === state.tabs.join()) expect(moved).toBe(state);
   });
 });

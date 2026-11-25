@@ -140,7 +140,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ThreadSplitPanes, ThreadTabStrip } from "./chat/ThreadWorkspace";
+import { ThreadSplitPanes, ThreadTabDropZones, ThreadTabStrip } from "./chat/ThreadWorkspace";
 import { BackgroundThreadContext } from "./chat/backgroundThread";
 import { WorkspaceMutationIdContext } from "./chat/ChatMarkdownMedia";
 import { useLocation, useNavigate } from "@tanstack/react-router";
@@ -3573,7 +3573,9 @@ export default function ChatView(props: ChatViewProps) {
             />
           </header>
         )}
-        {embedded ? null : <ThreadTabStrip />}
+        {embedded ? null : (
+          <ThreadTabStrip projectKey={`${activeThread.environmentId}:${activeThread.projectId}`} />
+        )}
 
         <div className="relative flex min-h-0 min-w-0 flex-1">
           <ThreadFindCanvas
@@ -4175,6 +4177,13 @@ export default function ChatView(props: ChatViewProps) {
               </>
             )}
           </ThreadFindCanvas>
+          {/* Splits sit under the header, clear of the panel and window controls in its corner. */}
+          {embedded || rightPanelMaximized ? null : (
+            <ThreadSplitPanes mainThreadKey={isServerThread ? activeThreadKey : null} />
+          )}
+          {embedded ? null : (
+            <ThreadTabDropZones mainThreadKey={isServerThread ? activeThreadKey : null} />
+          )}
         </div>
 
         {embedded ? null : (
@@ -4192,10 +4201,6 @@ export default function ChatView(props: ChatViewProps) {
           />
         )}
       </div>
-
-      {embedded || rightPanelMaximized ? null : (
-        <ThreadSplitPanes mainThreadKey={isServerThread ? activeThreadKey : null} />
-      )}
 
       {rightPanelPresent && activeThreadRef && !embedded ? (
         <ChatRightPanel

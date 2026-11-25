@@ -171,8 +171,8 @@ devices, using the same name everywhere. Threads you start on that device are th
 `by:<your name>` on the server, so your work and home computers both find them. **Everyone**
 lists every thread again, and the names of other people who use tags appear in the same menu.
 Older threads have no owner yet: right-click one and choose **Mark as mine**, or select several
-and mark them together. **Not my thread** removes the tag. The thread you have open always stays
-listed.
+and mark them together. **Not my thread** removes the tag. The thread you have open stays listed only while it has no
+owner, so switching to another person hides your own open thread from their list.
 
 ### Show threads from some machines
 

@@ -2,18 +2,18 @@
 //
 // The browser opens these as popup windows. Desktop recognizes the target-name prefix in its
 // window-open handler (apps/desktop/src/window/DesktopWindow.ts) and opens a full app window.
-export const APP_WINDOW_TARGET_PREFIX = "t3code-window-";
+const APP_WINDOW_TARGET_PREFIX = "t3code-window-";
 
 // The project a window opened for. The sidebar scope of such a window lives in its
 // sessionStorage, so scoping a project window never changes the main window's scope.
-export const WINDOW_PROJECT_SEARCH_PARAM = "windowProject";
+const WINDOW_PROJECT_SEARCH_PARAM = "windowProject";
 const WINDOW_SIDEBAR_SCOPE_STORAGE_KEY = "t3code:window-sidebar-scope";
 // The fork's desktop app names each window with a slot that survives restarts
 // (apps/desktop/src/window/ForkWindowSession.ts).
 const WINDOW_SLOT_SEARCH_PARAM = "windowSlot";
 
 /** This window's restart-stable slot, or null outside the fork's desktop app. */
-export function readWindowSlot(): string | null {
+function readWindowSlot(): string | null {
   if (typeof window === "undefined") return null;
   try {
     const slot = new URLSearchParams(window.location.search).get(WINDOW_SLOT_SEARCH_PARAM);

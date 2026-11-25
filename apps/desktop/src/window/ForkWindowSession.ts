@@ -5,7 +5,7 @@
 
 import * as NodeFS from "node:fs";
 
-export const WINDOW_SLOT_PARAM = "windowSlot";
+const WINDOW_SLOT_PARAM = "windowSlot";
 export const MAIN_WINDOW_SLOT = "main";
 
 export interface ForkWindowBounds {

@@ -3208,10 +3208,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "no computador que abriu esta página"
-      ]
+      "c": [" ", "no computador que abriu esta página"]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3223,10 +3220,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· quem executar recebe este acesso"
-      ]
+      "c": [" ", "· quem executar recebe este acesso"]
     }
   ],
   "c54cc9c75db9dc58": "Aprove apenas um login que você acabou de iniciar.",
@@ -12798,6 +12792,7 @@
   "449aa94a550859c6": "Abrir projeto em nova janela",
   "d4ece5c971d4b3e8": "Abrir em nova aba",
   "1df072b6acb2feef": "Abrir em visualização dividida",
+  "48f27f37056264cf": "Abrir aqui",
   "e767812b3ea33ec3": "Threads abertas",
   "91f13ad9b788f8d5": "Fechar visualização dividida",
   "b7a8465e4a5019e2": "Fechar outras abas",

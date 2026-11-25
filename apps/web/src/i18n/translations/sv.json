@@ -3208,10 +3208,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "på datorn som öppnade den här sidan"
-      ]
+      "c": [" ", "på datorn som öppnade den här sidan"]
     }
   ],
   "b2d53b4d1d48fbef": [
@@ -3223,10 +3220,7 @@
     {
       "t": "span",
       "i": 2,
-      "c": [
-        " ",
-        "· den som kör den får den här åtkomsten"
-      ]
+      "c": [" ", "· den som kör den får den här åtkomsten"]
     }
   ],
   "c54cc9c75db9dc58": "Godkänn bara en inloggning som du själv precis har startat.",
@@ -12805,6 +12799,7 @@
   "449aa94a550859c6": "Öppna projekt i nytt fönster",
   "d4ece5c971d4b3e8": "Öppna i ny flik",
   "1df072b6acb2feef": "Öppna i delad vy",
+  "48f27f37056264cf": "Öppna här",
   "e767812b3ea33ec3": "Öppna trådar",
   "91f13ad9b788f8d5": "Stäng delad vy",
   "b7a8465e4a5019e2": "Stäng andra flikar",

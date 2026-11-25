@@ -1,10 +1,19 @@
-import { parseScopedThreadKey, scopedThreadKey } from "@t3tools/client-runtime/environment";
+import {
+  parseScopedThreadKey,
+  scopeThreadRef,
+  scopedThreadKey,
+} from "@t3tools/client-runtime/environment";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { useRouter } from "@tanstack/react-router";
 import { useGT } from "gt-react";
-import { ArrowLeftRightIcon, XIcon } from "lucide-react";
-import { useEffect, type MouseEvent as ReactMouseEvent } from "react";
+import { ArrowLeftRightIcon, Columns2Icon, MessageSquareIcon, XIcon } from "lucide-react";
+import {
+  useEffect,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 
 import { openAppWindow } from "../../appWindows";
 import { ComposerHandleContext } from "../../composerHandleContext";
@@ -15,12 +24,14 @@ import type { SideChatParentPanel } from "../../lib/sideChatPane";
 import { cn } from "../../lib/utils";
 import { readLocalApi } from "../../localApi";
 import { useRightPanelStore } from "../../rightPanelStore";
-import { useQuietThreadShell } from "../../state/entities";
+import { useQuietThreadShell, useQuietThreadShells } from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
+import { threadTabsInGroup } from "../../threadWorkspace.logic";
 import { useThreadWorkspaceStore } from "../../threadWorkspaceStore";
 import ChatView from "../ChatView";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { BackgroundThreadContext } from "./backgroundThread";
 
 function useThreadNavigation() {
@@ -43,47 +54,123 @@ function useThreadNavigation() {
 
 type TabMenuId = "split" | "unsplit" | "new-window" | "close" | "close-others";
 
-/** The open threads of this window. Hidden until a second thread is opened in a tab. */
-export function ThreadTabStrip() {
+// Tabs drag with their own type, so the composer, the file drop and the sidebar ignore them.
+const THREAD_TAB_DRAG_TYPE = "application/x-t3code-thread-tab";
+
+function isThreadTabDrag(event: ReactDragEvent): boolean {
+  return event.dataTransfer.types.includes(THREAD_TAB_DRAG_TYPE);
+}
+
+/** A tab dropped beyond the window's edges moves the thread to a window of its own. */
+function droppedOutsideWindow(event: ReactDragEvent): boolean {
+  if (event.dataTransfer.dropEffect !== "none") return false;
+  const { screenX, screenY } = event;
+  // Some platforms report no position for a cancelled drag.
+  if (screenX === 0 && screenY === 0) return false;
+  return (
+    screenX < window.screenX ||
+    screenY < window.screenY ||
+    screenX > window.screenX + window.outerWidth ||
+    screenY > window.screenY + window.outerHeight
+  );
+}
+
+type ThreadNavigation = ReturnType<typeof useThreadNavigation>;
+
+function closeTabAndFollow(threadKey: string, wasActive: boolean, navigation: ThreadNavigation) {
+  const next = useThreadWorkspaceStore.getState().closeTab(threadKey);
+  if (!wasActive) return;
+  const nextRef = next === null ? null : parseScopedThreadKey(next);
+  if (nextRef === null) navigation.openHome();
+  else navigation.open(nextRef);
+}
+
+type DropSide = "before" | "after";
+
+/**
+ * The open threads of this window that belong to the open project (`projectKey`, as
+ * `environmentId:projectId`). Hidden until the project has a second tab, or while a draft
+ * leaves a tab to go back to.
+ */
+export function ThreadTabStrip(props: { readonly projectKey: string | null }) {
   const tabs = useThreadWorkspaceStore((state) => state.tabs);
   const activeKey = useThreadWorkspaceStore((state) => state.activeKey);
   const splits = useThreadWorkspaceStore((state) => state.splits);
+  const shells = useQuietThreadShells();
   const gt = useGT();
-  if (tabs.length < 2) return null;
+  const [dropTarget, setDropTarget] = useState<{
+    readonly key: string;
+    readonly side: DropSide;
+  } | null>(null);
+  const groupByKey = new Map<string, string>();
+  for (const shell of shells) {
+    groupByKey.set(
+      scopedThreadKey(scopeThreadRef(shell.environmentId, shell.id)),
+      `${shell.environmentId}:${shell.projectId}`,
+    );
+  }
+  const visible = threadTabsInGroup(tabs, props.projectKey, (key) => groupByKey.get(key) ?? null);
+  if (props.projectKey === null) return null;
+  if (visible.length < 2 && !(activeKey === null && visible.length === 1)) return null;
+  const lastKey = visible.at(-1) ?? null;
+  const showDropTarget = (key: string, side: DropSide) =>
+    setDropTarget((current) =>
+      current?.key === key && current.side === side ? current : { key, side },
+    );
   return (
     <div
       role="tablist"
       aria-label={gt("Open threads")}
-      className="flex h-8 min-h-8 shrink-0 items-stretch overflow-x-auto border-b border-border bg-muted/30 [scrollbar-width:none]"
+      className="relative flex h-9 min-h-9 shrink-0 items-end gap-0.5 overflow-x-auto bg-muted/50 px-1.5 [scrollbar-width:none] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border"
+      onDragOver={(event) => {
+        if (!isThreadTabDrag(event) || lastKey === null) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        // Past the last tab drops at the end of the strip.
+        if (event.target === event.currentTarget) showDropTarget(lastKey, "after");
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null);
+      }}
+      onDrop={(event) => {
+        const dragged = event.dataTransfer.getData(THREAD_TAB_DRAG_TYPE);
+        setDropTarget(null);
+        if (dragged === "" || dropTarget === null) return;
+        event.preventDefault();
+        useThreadWorkspaceStore.getState().moveTab(dragged, dropTarget.key, dropTarget.side);
+      }}
     >
-      {tabs.map((key) => (
+      {visible.map((key) => (
         <ThreadTab
           key={key}
           threadKey={key}
           active={key === activeKey}
           inSplit={splits.includes(key)}
+          dropSide={dropTarget?.key === key ? dropTarget.side : null}
+          onDropSide={(side) => showDropTarget(key, side)}
         />
       ))}
     </div>
   );
 }
 
-function ThreadTab(props: { threadKey: string; active: boolean; inSplit: boolean }) {
-  const { threadKey, active, inSplit } = props;
+function ThreadTab(props: {
+  threadKey: string;
+  active: boolean;
+  inSplit: boolean;
+  dropSide: DropSide | null;
+  onDropSide: (side: DropSide) => void;
+}) {
+  const { threadKey, active, inSplit, dropSide, onDropSide } = props;
   const gt = useGT();
   const navigation = useThreadNavigation();
   const ref = parseScopedThreadKey(threadKey);
   const shell = useQuietThreadShell(ref);
+  const dragging = useThreadWorkspaceStore((state) => state.draggingKey === threadKey);
   if (ref === null) return null;
   const title = shell?.title ?? gt("Thread");
 
-  const close = () => {
-    const next = useThreadWorkspaceStore.getState().closeTab(threadKey);
-    if (!active) return;
-    const nextRef = next === null ? null : parseScopedThreadKey(next);
-    if (nextRef === null) navigation.openHome();
-    else navigation.open(nextRef);
-  };
+  const close = () => closeTabAndFollow(threadKey, active, navigation);
 
   const showMenu = (event: ReactMouseEvent) => {
     event.preventDefault();
@@ -136,12 +223,13 @@ function ThreadTab(props: { threadKey: string; active: boolean; inSplit: boolean
       role="tab"
       aria-selected={active}
       tabIndex={active ? 0 : -1}
-      title={title}
+      draggable
       className={cn(
-        "group relative flex max-w-56 min-w-28 shrink-0 cursor-default items-center gap-1 border-r border-border pr-1 pl-3 text-xs select-none",
+        "group/tab relative flex h-7.5 max-w-60 min-w-32 shrink-0 cursor-default items-center gap-1.5 rounded-t-lg border border-b-0 pr-1 pl-2.5 text-xs select-none",
         active
-          ? "bg-background font-medium text-foreground"
-          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+          ? "z-[1] border-border bg-background font-medium text-foreground before:absolute before:inset-x-3 before:-top-px before:h-0.5 before:rounded-b-full before:bg-primary"
+          : "border-transparent text-muted-foreground hover:bg-background/60 hover:text-foreground",
+        dragging && "opacity-40",
       )}
       onClick={() => {
         if (!active) navigation.open(ref);
@@ -156,21 +244,123 @@ function ThreadTab(props: { threadKey: string; active: boolean; inSplit: boolean
         if (event.key === "Enter" && !active) navigation.open(ref);
       }}
       onContextMenu={showMenu}
+      onDragStart={(event) => {
+        event.dataTransfer.setData(THREAD_TAB_DRAG_TYPE, threadKey);
+        event.dataTransfer.effectAllowed = "move";
+        // Rendering the drop zones during dragstart can cancel the drag in Chromium.
+        window.setTimeout(() => useThreadWorkspaceStore.getState().setDraggingKey(threadKey), 0);
+      }}
+      onDragEnd={(event) => {
+        useThreadWorkspaceStore.getState().setDraggingKey(null);
+        if (!droppedOutsideWindow(event)) return;
+        navigation.openWindow(ref);
+        close();
+      }}
+      onDragOver={(event) => {
+        if (!isThreadTabDrag(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        const rect = event.currentTarget.getBoundingClientRect();
+        onDropSide(event.clientX < rect.left + rect.width / 2 ? "before" : "after");
+      }}
     >
-      {inSplit ? <ArrowLeftRightIcon aria-hidden className="size-3 shrink-0 opacity-60" /> : null}
-      <span className="min-w-0 flex-1 truncate">{title}</span>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        aria-label={gt("Close tab")}
-        className={cn("size-5 shrink-0", active ? "" : "opacity-0 group-hover:opacity-100")}
-        onClick={(event) => {
-          event.stopPropagation();
-          close();
-        }}
+      {dropSide === null ? null : (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-y-1 w-0.5 rounded-full bg-primary",
+            dropSide === "before" ? "-left-px" : "-right-px",
+          )}
+        />
+      )}
+      {inSplit ? (
+        <Columns2Icon aria-hidden className="size-3.5 shrink-0 text-primary" />
+      ) : (
+        <MessageSquareIcon aria-hidden className="size-3.5 shrink-0 opacity-60" />
+      )}
+      <Tooltip>
+        <TooltipTrigger render={<span className="min-w-0 flex-1 truncate" />}>
+          {title}
+        </TooltipTrigger>
+        <TooltipPopup side="bottom">{title}</TooltipPopup>
+      </Tooltip>
+      <span
+        className={cn(
+          "flex shrink-0",
+          !active && "opacity-0 group-hover/tab:opacity-100 focus-within:opacity-100",
+        )}
       >
-        <XIcon className="size-3" />
-      </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={gt("Close tab")}
+          draggable={false}
+          className="size-5"
+          onClick={(event) => {
+            event.stopPropagation();
+            close();
+          }}
+        >
+          <XIcon className="size-3" />
+        </Button>
+      </span>
+    </div>
+  );
+}
+
+type DropZone = "here" | "split";
+
+/**
+ * Shown over the chat while one of its tabs is dragged: drop on the left half to open the
+ * thread here, on the right half to open it beside the main pane.
+ */
+export function ThreadTabDropZones(props: { readonly mainThreadKey: string | null }) {
+  const draggingKey = useThreadWorkspaceStore((state) => state.draggingKey);
+  const gt = useGT();
+  const navigation = useThreadNavigation();
+  const [hovered, setHovered] = useState<DropZone | null>(null);
+  if (draggingKey === null || draggingKey === props.mainThreadKey) return null;
+  const zone = (side: DropZone, label: string) => (
+    <div
+      key={side}
+      className="flex flex-1 p-2"
+      onDragOver={(event) => {
+        if (!isThreadTabDrag(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        if (hovered !== side) setHovered(side);
+      }}
+      onDragLeave={() => setHovered((current) => (current === side ? null : current))}
+      onDrop={(event) => {
+        const key = event.dataTransfer.getData(THREAD_TAB_DRAG_TYPE);
+        setHovered(null);
+        const ref = key === "" ? null : parseScopedThreadKey(key);
+        if (ref === null) return;
+        event.preventDefault();
+        if (side === "split") useThreadWorkspaceStore.getState().openSplit(key);
+        else navigation.open(ref);
+      }}
+    >
+      <div
+        className={cn(
+          "pointer-events-none flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed text-sm font-medium",
+          hovered === side
+            ? "border-primary bg-primary/10 text-primary"
+            : "border-border/60 text-muted-foreground",
+        )}
+      >
+        {side === "split" ? <Columns2Icon aria-hidden className="size-4" /> : null}
+        {label}
+      </div>
+    </div>
+  );
+  return (
+    <div className="absolute inset-0 z-40 flex bg-background/85">
+      {zone(
+        "here",
+        gt("Open here", { $context: "drop target that opens a dragged thread tab in this pane" }),
+      )}
+      {zone("split", gt("Open in split view"))}
     </div>
   );
 }
@@ -241,13 +431,13 @@ function ThreadSplitPane(props: { readonly threadKey: string }) {
       data-side-chat-pane={ref.threadId}
       data-thread-split-pane
       aria-label={shell?.title ?? gt("Thread")}
-      className="hidden min-h-0 min-w-80 flex-1 flex-col border-l border-border md:flex"
+      className="hidden min-h-0 min-w-80 flex-1 flex-col border-l border-border bg-background md:flex"
     >
-      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border pr-1 pl-3">
+      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border bg-muted/30 pr-1.5 pl-3">
+        <Columns2Icon aria-hidden className="size-3.5 shrink-0 text-primary" />
         <button
           type="button"
-          className="min-w-0 flex-1 truncate text-left text-xs font-medium hover:underline"
-          title={gt("Show in the main pane")}
+          className="min-w-0 flex-1 truncate text-left text-xs font-medium hover:text-primary"
           onClick={() => navigation.open(ref)}
         >
           {shell?.title ?? gt("Thread")}
